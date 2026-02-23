@@ -1,0 +1,191 @@
+import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+import { DAILY_STRUCTURE } from "@/lib/questions";
+
+export async function GET() {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Get user's couple
+  const { data: profile } = await supabase
+    .from("users")
+    .select("couple_id, timezone")
+    .eq("id", user.id)
+    .single();
+
+  if (!profile?.couple_id) {
+    return NextResponse.json({ error: "No couple found" }, { status: 404 });
+  }
+
+  const couple_id = profile.couple_id;
+  const timezone = profile.timezone || "America/New_York";
+
+  // Get today's date in the couple's timezone
+  const today = getDateInTimezone(timezone);
+
+  // Check if daily questions already exist for today
+  const { data: existing } = await supabase
+    .from("daily_questions")
+    .select("*, question:questions(*)")
+    .eq("couple_id", couple_id)
+    .eq("question_date", today)
+    .order("position");
+
+  if (existing && existing.length === 7) {
+    // Load answers for these questions
+    const questionIds = existing.map((dq) => dq.id);
+    const { data: answers } = await supabase
+      .from("answers")
+      .select("*")
+      .in("daily_question_id", questionIds);
+
+    const { data: favorites } = await supabase
+      .from("favorites")
+      .select("*")
+      .in("daily_question_id", questionIds)
+      .eq("user_id", user.id);
+
+    const withDetails = existing.map((dq) => ({
+      ...dq,
+      answers: (answers || []).filter((a) => a.daily_question_id === dq.id),
+      favorites: (favorites || []).filter((f) => f.daily_question_id === dq.id),
+    }));
+
+    return NextResponse.json({ questions: withDetails, date: today });
+  }
+
+  // Generate new daily questions
+  // Get already-used question IDs for this couple (last 60 days to avoid repeats)
+  const { data: recentQuestions } = await supabase
+    .from("daily_questions")
+    .select("question_id")
+    .eq("couple_id", couple_id)
+    .gte("question_date", getDateNDaysAgo(60, timezone));
+
+  const usedIds = new Set((recentQuestions || []).map((q) => q.question_id));
+
+  const newDailyQuestions = [];
+
+  for (let i = 0; i < DAILY_STRUCTURE.length; i++) {
+    const category = DAILY_STRUCTURE[i];
+
+    // Get a random unused question from this category
+    let query = supabase
+      .from("questions")
+      .select("id")
+      .eq("category", category);
+
+    if (usedIds.size > 0) {
+      // Filter out used questions by fetching all and filtering client-side
+      const { data: available } = await query;
+      const filtered = (available || []).filter((q) => !usedIds.has(q.id));
+
+      if (filtered.length === 0) {
+        // All questions used — reset and pick any
+        const { data: any } = await supabase
+          .from("questions")
+          .select("id")
+          .eq("category", category);
+        if (!any || any.length === 0) continue;
+        const pick = any[Math.floor(Math.random() * any.length)];
+        newDailyQuestions.push({
+          couple_id,
+          question_id: pick.id,
+          question_date: today,
+          position: i + 1,
+        });
+        usedIds.add(pick.id);
+      } else {
+        const pick = filtered[Math.floor(Math.random() * filtered.length)];
+        newDailyQuestions.push({
+          couple_id,
+          question_id: pick.id,
+          question_date: today,
+          position: i + 1,
+        });
+        usedIds.add(pick.id);
+      }
+    } else {
+      const { data: available } = await query;
+      if (!available || available.length === 0) continue;
+      const pick =
+        available[Math.floor(Math.random() * available.length)];
+      newDailyQuestions.push({
+        couple_id,
+        question_id: pick.id,
+        question_date: today,
+        position: i + 1,
+      });
+      usedIds.add(pick.id);
+    }
+  }
+
+  // Insert daily questions
+  const { error: insertError } = await supabase
+    .from("daily_questions")
+    .insert(newDailyQuestions);
+
+  if (insertError) {
+    // Might be a race condition — try fetching again
+    const { data: retryExisting } = await supabase
+      .from("daily_questions")
+      .select("*, question:questions(*)")
+      .eq("couple_id", couple_id)
+      .eq("question_date", today)
+      .order("position");
+
+    if (retryExisting && retryExisting.length > 0) {
+      return NextResponse.json({ questions: retryExisting, date: today });
+    }
+
+    return NextResponse.json(
+      { error: "Failed to generate questions" },
+      { status: 500 }
+    );
+  }
+
+  // Fetch the newly created questions with full details
+  const { data: created } = await supabase
+    .from("daily_questions")
+    .select("*, question:questions(*)")
+    .eq("couple_id", couple_id)
+    .eq("question_date", today)
+    .order("position");
+
+  const withDetails = (created || []).map((dq) => ({
+    ...dq,
+    answers: [],
+    favorites: [],
+  }));
+
+  return NextResponse.json({ questions: withDetails, date: today });
+}
+
+function getDateInTimezone(timezone: string): string {
+  const now = new Date();
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  return formatter.format(now);
+}
+
+function getDateNDaysAgo(n: number, timezone: string): string {
+  const now = new Date();
+  now.setDate(now.getDate() - n);
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  return formatter.format(now);
+}

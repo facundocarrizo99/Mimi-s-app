@@ -1,0 +1,61 @@
+@import "tailwindcss";
+
+@theme {
+  --color-blush: #f8e8e0;
+  --color-blush-dark: #f0d0c0;
+  --color-lavender: #e8daf0;
+  --color-lavender-dark: #d0b8e0;
+  --color-dusk: #c8d8f0;
+  --color-dusk-dark: #a8c0e8;
+  --color-rose: #e8a0a0;
+  --color-rose-dark: #d07070;
+  --color-warmwhite: #fdf8f4;
+  --color-softgray: #f0ebe6;
+  --color-textprimary: #3d2e2e;
+  --color-textsecondary: #6b5a5a;
+  --color-textmuted: #9a8a8a;
+
+  --font-serif: "Georgia", "Times New Roman", serif;
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+}
+
+body {
+  background: linear-gradient(135deg, var(--color-warmwhite) 0%, var(--color-blush) 50%, var(--color-lavender) 100%);
+  color: var(--color-textprimary);
+  min-height: 100vh;
+  font-family: var(--font-sans);
+}
+
+/* Soft scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-blush-dark);
+  border-radius: 3px;
+}
+
+/* Heart pulse animation */
+@keyframes heartPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+}
+
+.heart-pulse {
+  animation: heartPulse 1.2s ease-in-out infinite;
+}
+
+/* Soft glow */
+@keyframes softGlow {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.8; }
+}
+
+.soft-glow {
+  animation: softGlow 3s ease-in-out infinite;
+}
