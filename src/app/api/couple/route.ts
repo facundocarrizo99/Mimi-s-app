@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 
 // GET: Get couple info
 export async function GET() {
@@ -51,6 +51,28 @@ export async function POST(request: NextRequest) {
   const { action, invite_code, timezone } = await request.json();
 
   if (action === "create") {
+    // Ensure user profile exists in public.users before creating couple
+    // Use service client to bypass RLS
+    const serviceClient = await createServiceClient();
+    const { error: upsertError } = await serviceClient
+      .from("users")
+      .upsert(
+        {
+          id: user.id,
+          email: user.email ?? "",
+          display_name:
+            user.user_metadata?.display_name ??
+            user.email?.split("@")[0] ??
+            "",
+        },
+        { onConflict: "id" }
+      );
+
+    if (upsertError) {
+      console.error("Failed to upsert user profile:", upsertError);
+      return NextResponse.json({ error: "Failed to create user profile" }, { status: 500 });
+    }
+
     // Create a new couple space
     const { data: couple, error } = await supabase
       .from("couples")
