@@ -28,11 +28,11 @@ export default function Home() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <motion.div
-          animate={{ scale: [1, 1.1, 1] }}
-          transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-          className="text-4xl"
+          animate={{ opacity: [0.4, 1, 0.4] }}
+          transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+          className="text-2xl font-serif text-textprimary"
         >
-          &#10084;&#65039;
+          Ours
         </motion.div>
       </div>
     );
@@ -46,23 +46,14 @@ export default function Home() {
         transition={{ duration: 0.8 }}
         className="text-center max-w-md"
       >
-        <motion.div
-          animate={{ scale: [1, 1.1, 1] }}
-          transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-          className="text-6xl mb-6"
-        >
-          &#10084;&#65039;
-        </motion.div>
-
         <h1 className="font-serif text-4xl text-textprimary mb-3">Ours</h1>
 
         <p className="text-textsecondary text-lg mb-2 font-serif italic">
-          A quiet space for two hearts across distance.
+          A little space for two.
         </p>
 
         <p className="text-textmuted text-sm mb-8 max-w-xs mx-auto leading-relaxed">
-          Seven questions every day. Two people choosing each other.
-          A love letter that writes itself, one answer at a time.
+          Seven questions a day, answered together.
         </p>
 
         <motion.div
@@ -74,18 +65,9 @@ export default function Home() {
             href="/auth/login"
             className="inline-flex items-center justify-center px-8 py-3 rounded-xl bg-rose/80 hover:bg-rose text-white font-medium shadow-sm hover:shadow transition-all duration-200"
           >
-            Enter your space
+            Get started
           </a>
         </motion.div>
-
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.8 }}
-          className="text-textmuted text-xs mt-6 italic"
-        >
-          This space belongs only to you two.
-        </motion.p>
       </motion.div>
     </div>
   );

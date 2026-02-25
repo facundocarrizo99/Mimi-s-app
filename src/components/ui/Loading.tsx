@@ -1,16 +1,8 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { getPoeticsLoadingMessage } from "@/lib/utils";
-import { useState, useEffect } from "react";
 
 export function Loading() {
-  const [message, setMessage] = useState("");
-
-  useEffect(() => {
-    setMessage(getPoeticsLoadingMessage());
-  }, []);
-
   return (
     <div className="min-h-screen flex items-center justify-center">
       <motion.div
@@ -19,15 +11,12 @@ export function Loading() {
         className="text-center"
       >
         <motion.div
-          animate={{ scale: [1, 1.1, 1] }}
-          transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-          className="text-4xl mb-6"
+          animate={{ opacity: [0.3, 1, 0.3] }}
+          transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+          className="text-lg font-serif text-textsecondary"
         >
-          &#10084;
+          Loading…
         </motion.div>
-        <p className="text-textsecondary font-serif italic text-lg">
-          {message}
-        </p>
       </motion.div>
     </div>
   );

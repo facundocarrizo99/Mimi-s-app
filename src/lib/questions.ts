@@ -22,11 +22,11 @@ export const DAILY_STRUCTURE: QuestionCategory[] = [
 
 export function getCategoryLabel(category: QuestionCategory): string {
   const labels: Record<QuestionCategory, string> = {
-    deep: "Deep & Vulnerable",
+    deep: "Deep",
     romantic: "Romantic",
     playful: "Playful",
-    future: "Future Dreams",
-    memory: "Memory Lane",
+    future: "Future",
+    memory: "Memory",
     wildcard: "Wildcard",
   };
   return labels[category];

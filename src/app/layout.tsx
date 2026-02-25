@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Ours",
-  description: "A quiet space for two hearts across distance.",
+  description: "A little space for two.",
 };
 
 export default function RootLayout({

@@ -42,16 +42,9 @@ export default function LoginPage() {
         className="w-full max-w-sm"
       >
         <div className="text-center mb-10">
-          <motion.div
-            animate={{ scale: [1, 1.1, 1] }}
-            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-            className="text-5xl mb-4"
-          >
-            &#10084;&#65039;
-          </motion.div>
           <h1 className="font-serif text-3xl text-textprimary mb-2">Ours</h1>
           <p className="text-textsecondary text-sm">
-            A quiet space for two hearts across distance.
+            A little space for two.
           </p>
         </div>
 
@@ -66,9 +59,6 @@ export default function LoginPage() {
             </p>
             <p className="text-textsecondary text-sm">
               A magic link is on its way to <strong>{email}</strong>.
-            </p>
-            <p className="text-textmuted text-xs mt-4 italic">
-              Your words are safe here.
             </p>
           </motion.div>
         ) : (
@@ -100,10 +90,6 @@ export default function LoginPage() {
             >
               {loading ? "Sending..." : "Send magic link"}
             </Button>
-
-            <p className="text-textmuted text-xs mt-4 text-center italic">
-              This space belongs only to you two.
-            </p>
           </form>
         )}
       </motion.div>

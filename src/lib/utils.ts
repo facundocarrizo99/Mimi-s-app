@@ -24,26 +24,22 @@ export function getTodayDate(timezone: string = "America/New_York"): string {
 
 export function getPoeticsLoadingMessage(): string {
   const messages = [
-    "Gathering today's questions\u2026",
-    "Love takes a moment.",
-    "Preparing something meaningful\u2026",
-    "Your words are finding their way\u2026",
-    "A quiet space is being made\u2026",
-    "Wrapping today in warmth\u2026",
-    "Something gentle is arriving\u2026",
-    "Opening today's chapter\u2026",
+    "Loading\u2026",
+    "One sec\u2026",
+    "Getting things ready\u2026",
+    "Almost there\u2026",
   ];
   return messages[Math.floor(Math.random() * messages.length)];
 }
 
 export function getStreakMessage(count: number): string {
   if (count === 0) return "Start your streak today.";
-  if (count === 1) return "You showed up for love today.";
-  if (count < 7) return `${count} days of choosing each other.`;
-  if (count < 14) return `${count} days in a row. Beautiful.`;
-  if (count < 30) return `${count} days of showing up for love.`;
-  if (count < 100) return `${count} days. This is something special.`;
-  return `${count} days. You've built something rare.`;
+  if (count === 1) return "Day one. Nice.";
+  if (count < 7) return `${count} days in a row.`;
+  if (count < 14) return `${count} day streak!`;
+  if (count < 30) return `${count} days and counting.`;
+  if (count < 100) return `${count} days. Not bad at all.`;
+  return `${count} days. Impressive.`;
 }
 
 export function cn(...classes: (string | boolean | undefined | null)[]): string {

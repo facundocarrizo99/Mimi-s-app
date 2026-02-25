@@ -121,7 +121,7 @@ export default function MemoryPage() {
             Memory Book
           </h2>
           <p className="text-sm text-textsecondary">
-            Every word, kept safe.
+            Past answers, all in one place.
           </p>
         </motion.div>
 
@@ -188,8 +188,8 @@ export default function MemoryPage() {
               animate={{ opacity: 1 }}
               className="text-center py-12"
             >
-              <p className="text-textsecondary font-serif italic">
-                Your story is just beginning.
+              <p className="text-textsecondary text-sm">
+                Nothing here yet. Answer some questions first!
               </p>
             </motion.div>
           ) : (
@@ -272,7 +272,7 @@ function MemoryCard({
         )}
         {partnerAnswer && (
           <div className="rounded-xl bg-lavender/20 p-3">
-            <p className="text-xs text-textmuted mb-0.5">Your love</p>
+            <p className="text-xs text-textmuted mb-0.5">Them</p>
             <p className="text-sm text-textprimary">{partnerAnswer.text}</p>
           </div>
         )}

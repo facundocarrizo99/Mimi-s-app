@@ -113,7 +113,7 @@ export default function SettingsPage() {
           <h2 className="font-serif text-2xl text-textprimary mb-1">
             Settings
           </h2>
-          <p className="text-sm text-textsecondary">Your space, your way.</p>
+          <p className="text-sm text-textsecondary">Manage your account.</p>
         </motion.div>
 
         {/* Profile */}
@@ -204,14 +204,10 @@ export default function SettingsPage() {
           </Card>
         )}
 
-        {/* Privacy reminder */}
-        <Card delay={0.2} className="text-center">
-          <p className="text-sm text-textsecondary italic font-serif">
-            &ldquo;This space belongs only to you two.
-            <br />
-            Your words are safe here.&rdquo;
-          </p>
-        </Card>
+        {/* Privacy note */}
+        <p className="text-xs text-textmuted text-center">
+          Your data stays private.
+        </p>
 
         {/* Sign out */}
         <div className="text-center pt-4">

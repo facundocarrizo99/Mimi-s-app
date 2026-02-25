@@ -4,7 +4,6 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { HeartPulse } from "@/components/ui/HeartPulse";
 import { getCategoryLabel, getCategoryColor } from "@/lib/questions";
 import type { DailyQuestionWithDetails, QuestionCategory } from "@/types/database";
 
@@ -88,7 +87,7 @@ export function QuestionCard({
               disabled={submitting || !answerText.trim()}
               size="sm"
             >
-              {submitting ? "Saving..." : "Share with love"}
+              {submitting ? "Saving..." : "Share"}
             </Button>
           </div>
         </div>
@@ -112,10 +111,7 @@ export function QuestionCard({
                 transition={{ duration: 0.5, ease: "easeOut" }}
                 className="rounded-xl bg-lavender/30 p-4"
               >
-                <div className="flex items-center gap-1.5 mb-1">
-                  <p className="text-xs text-textmuted">Your love wrote</p>
-                  <HeartPulse size="sm" />
-                </div>
+                <p className="text-xs text-textmuted mb-1">Them</p>
                 <p className="text-sm text-textprimary leading-relaxed">
                   {partnerAnswer?.text}
                 </p>
@@ -127,8 +123,8 @@ export function QuestionCard({
                 animate={{ opacity: 1 }}
                 className="text-center py-3"
               >
-                <p className="text-sm text-textmuted italic font-serif">
-                  Your words are waiting for your love.
+                <p className="text-sm text-textmuted italic">
+                  Waiting for their answer…
                 </p>
               </motion.div>
             )}

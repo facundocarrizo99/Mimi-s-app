@@ -28,8 +28,7 @@ export function AppShell({ children, streakCount }: AppShellProps) {
           </Link>
           {streakCount !== undefined && streakCount > 0 && (
             <span className="text-sm text-textsecondary flex items-center gap-1.5">
-              <span className="text-rose-dark">&#10084;</span>
-              {streakCount} day{streakCount !== 1 ? "s" : ""}
+              {streakCount} day{streakCount !== 1 ? "s" : ""} ✨
             </span>
           )}
         </div>

@@ -198,19 +198,9 @@ export default function DailyPage() {
             transition={{ duration: 0.6, delay: 0.3 }}
             className="text-center py-8"
           >
-            <motion.div
-              animate={{ scale: [1, 1.15, 1] }}
-              transition={{
-                duration: 1.2,
-                repeat: Infinity,
-                ease: "easeInOut",
-              }}
-              className="text-4xl mb-3"
-            >
-              &#10084;&#65039;
-            </motion.div>
-            <p className="font-serif text-xl text-textprimary">
-              You chose each other today.
+            <p className="text-2xl mb-3">&#10024;</p>
+            <p className="font-serif text-lg text-textprimary">
+              All done for today.
             </p>
           </motion.div>
         )}
@@ -300,12 +290,11 @@ function SetupFlow({
         className="w-full max-w-sm"
       >
         <div className="text-center mb-8">
-          <div className="text-4xl mb-3">&#10084;&#65039;</div>
           <h1 className="font-serif text-2xl text-textprimary mb-1">
-            Welcome to Ours
+            Welcome
           </h1>
           <p className="text-textsecondary text-sm">
-            Let&apos;s set up your private space.
+            Let&apos;s get you set up.
           </p>
         </div>
 
@@ -319,7 +308,7 @@ function SetupFlow({
               type="text"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
-              placeholder="What should your love call you?"
+              placeholder="Your name"
               className="w-full px-4 py-2.5 rounded-xl bg-white/60 border border-white/50 text-textprimary placeholder:text-textmuted focus:outline-none focus:ring-2 focus:ring-rose/30 transition text-sm"
             />
           </div>
@@ -358,7 +347,7 @@ function SetupFlow({
                 disabled={loading}
                 className="w-full px-4 py-2.5 rounded-xl bg-rose/80 hover:bg-rose text-white text-sm font-medium transition disabled:opacity-50"
               >
-                {loading ? "Creating..." : "Create our space"}
+                {loading ? "Creating..." : "Create space"}
               </button>
             </div>
           )}
@@ -375,14 +364,11 @@ function SetupFlow({
               <div className="text-2xl font-mono tracking-widest text-textprimary bg-white/50 rounded-xl p-4 mb-3">
                 {createdCode}
               </div>
-              <p className="text-xs text-textmuted italic">
-                Once they join, your space will be complete.
-              </p>
               <button
                 onClick={onComplete}
                 className="mt-4 text-sm text-rose-dark hover:text-rose transition"
               >
-                They&apos;ve joined &mdash; take me in
+                They&apos;ve joined &mdash; continue
               </button>
             </motion.div>
           )}
@@ -401,7 +387,7 @@ function SetupFlow({
                 disabled={loading || !inviteCode.trim()}
                 className="w-full px-4 py-2.5 rounded-xl bg-rose/80 hover:bg-rose text-white text-sm font-medium transition disabled:opacity-50"
               >
-                {loading ? "Joining..." : "Join your love"}
+                {loading ? "Joining..." : "Join"}
               </button>
             </div>
           )}
@@ -420,8 +406,8 @@ function SetupFlow({
           )}
         </div>
 
-        <p className="text-textmuted text-xs text-center mt-4 italic">
-          This space belongs only to you two.
+        <p className="text-textmuted text-xs text-center mt-4">
+          Just you two.
         </p>
       </motion.div>
     </div>
