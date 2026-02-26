@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
@@ -44,8 +44,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Not authorized" }, { status: 403 });
   }
 
-  // Upsert answer
-  const { data: answer, error } = await supabase
+  // Upsert answer — use service client to bypass RLS issues
+  const serviceClient = await createServiceClient();
+  const { data: answer, error } = await serviceClient
     .from("answers")
     .upsert(
       {
@@ -66,22 +67,15 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Check if both partners have answered all 7 questions today
-  const { data: todayQuestions } = await supabase
-    .from("daily_questions")
-    .select("id")
-    .eq("couple_id", dq.couple_id)
-    .eq("question_date", dq.couple_id); // This is just for fetching same-date questions
-
   // Get today's date from the daily question
-  const { data: fullDq } = await supabase
+  const { data: fullDq } = await serviceClient
     .from("daily_questions")
     .select("question_date")
     .eq("id", daily_question_id)
     .single();
 
   if (fullDq) {
-    const { data: allTodayQuestions } = await supabase
+    const { data: allTodayQuestions } = await serviceClient
       .from("daily_questions")
       .select("id")
       .eq("couple_id", dq.couple_id)
@@ -91,7 +85,7 @@ export async function POST(request: NextRequest) {
       const qIds = allTodayQuestions.map((q) => q.id);
 
       // Count answers by each user
-      const { data: allAnswers } = await supabase
+      const { data: allAnswers } = await serviceClient
         .from("answers")
         .select("user_id")
         .in("daily_question_id", qIds);
@@ -111,7 +105,7 @@ export async function POST(request: NextRequest) {
           couple.user_1_id &&
           couple.user_2_id
         ) {
-          await supabase.rpc("update_streak", {
+          await serviceClient.rpc("update_streak", {
             p_couple_id: dq.couple_id,
             p_date: fullDq.question_date,
           });

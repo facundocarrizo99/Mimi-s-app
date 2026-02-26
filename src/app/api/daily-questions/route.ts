@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { DAILY_STRUCTURE } from "@/lib/questions";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(request: NextRequest) {
   const supabase = await createClient();
 
@@ -55,13 +57,15 @@ export async function GET(request: NextRequest) {
 
   if (existing && existing.length === 7) {
     // Load answers for these questions
+    // Use service client to bypass RLS — we already verified couple membership above
+    const serviceClient = await createServiceClient();
     const questionIds = existing.map((dq) => dq.id);
-    const { data: answers } = await supabase
+    const { data: answers } = await serviceClient
       .from("answers")
       .select("*")
       .in("daily_question_id", questionIds);
 
-    const { data: favorites } = await supabase
+    const { data: favorites } = await serviceClient
       .from("favorites")
       .select("*")
       .in("daily_question_id", questionIds)

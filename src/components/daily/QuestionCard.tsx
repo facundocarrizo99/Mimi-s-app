@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { getCategoryLabel, getCategoryColor } from "@/lib/questions";
@@ -12,7 +11,6 @@ interface QuestionCardProps {
   currentUserId: string;
   index: number;
   onAnswer: (dailyQuestionId: string, text: string) => Promise<void>;
-  onFavorite: (dailyQuestionId: string) => Promise<void>;
 }
 
 export function QuestionCard({
@@ -20,7 +18,6 @@ export function QuestionCard({
   currentUserId,
   index,
   onAnswer,
-  onFavorite,
 }: QuestionCardProps) {
   const [answerText, setAnswerText] = useState(() => {
     const existing = dailyQuestion.answers.find(
@@ -33,14 +30,16 @@ export function QuestionCard({
     dailyQuestion.answers.some((a) => a.user_id === currentUserId)
   );
 
+  // Sync submitted state when answers arrive via props (e.g. after refetch)
+  useEffect(() => {
+    if (dailyQuestion.answers.some((a) => a.user_id === currentUserId)) {
+      setSubmitted(true);
+    }
+  }, [dailyQuestion.answers, currentUserId]);
+
   const myAnswer = dailyQuestion.answers.find(
     (a) => a.user_id === currentUserId
   );
-  const partnerAnswer = dailyQuestion.answers.find(
-    (a) => a.user_id !== currentUserId
-  );
-  const bothAnswered = myAnswer && partnerAnswer;
-  const isFavorited = dailyQuestion.favorites.length > 0;
 
   const category = dailyQuestion.question?.category as QuestionCategory;
 
@@ -100,53 +99,6 @@ export function QuestionCard({
               {myAnswer?.text || answerText}
             </p>
           </div>
-
-          {/* Partner's answer or waiting message */}
-          <AnimatePresence mode="wait">
-            {bothAnswered ? (
-              <motion.div
-                key="partner-answer"
-                initial={{ opacity: 0, y: 10, scale: 0.98 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                transition={{ duration: 0.5, ease: "easeOut" }}
-                className="rounded-xl bg-lavender/30 p-4"
-              >
-                <p className="text-xs text-textmuted mb-1">Them</p>
-                <p className="text-sm text-textprimary leading-relaxed">
-                  {partnerAnswer?.text}
-                </p>
-              </motion.div>
-            ) : (
-              <motion.div
-                key="waiting"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="text-center py-3"
-              >
-                <p className="text-sm text-textmuted italic">
-                  Waiting for their answer…
-                </p>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Favorite button */}
-          {bothAnswered && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.3 }}
-              className="flex justify-center pt-2"
-            >
-              <button
-                onClick={() => onFavorite(dailyQuestion.id)}
-                className="text-2xl transition-transform hover:scale-110 active:scale-95"
-                title={isFavorited ? "Remove from favorites" : "Save to favorites"}
-              >
-                <span dangerouslySetInnerHTML={{ __html: isFavorited ? "&#10084;&#65039;" : "&#9825;" }} />
-              </button>
-            </motion.div>
-          )}
         </div>
       )}
     </Card>

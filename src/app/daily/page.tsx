@@ -108,35 +108,6 @@ export default function DailyPage() {
     }
   }
 
-  async function handleFavorite(dailyQuestionId: string) {
-    await fetch("/api/daily-questions/favorite", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ daily_question_id: dailyQuestionId }),
-    });
-    // Update local state
-    setQuestions((prev) =>
-      prev.map((q) =>
-        q.id === dailyQuestionId
-          ? {
-              ...q,
-              favorites:
-                q.favorites.length > 0
-                  ? []
-                  : [
-                      {
-                        id: "temp",
-                        user_id: profile?.id || "",
-                        daily_question_id: dailyQuestionId,
-                        created_at: new Date().toISOString(),
-                      },
-                    ],
-            }
-          : q
-      )
-    );
-  }
-
   async function handleMood(emoji: string, reflection: string) {
     await fetch("/api/mood", {
       method: "POST",
@@ -148,9 +119,11 @@ export default function DailyPage() {
 
   if (loading) return <Loading />;
 
-  const allBothAnswered =
+  const allMyAnswered =
     questions.length === 7 &&
-    questions.every((q) => q.answers.length >= 2);
+    questions.every((q) =>
+      q.answers.some((a) => a.user_id === profile?.id)
+    );
 
   return (
     <AppShell streakCount={couple?.streak_count} coupleId={coupleId || undefined}>
@@ -176,6 +149,28 @@ export default function DailyPage() {
           onSubmit={handleMood}
         />
 
+        {/* See partner's answers button — only when user answered all 7 */}
+        {allMyAnswered && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <button
+              onClick={() => router.push(`/answers?couple=${coupleId}`)}
+              className="w-full rounded-2xl bg-lavender/40 hover:bg-lavender/60 backdrop-blur-sm border border-white/50 p-5 transition-all duration-200 text-center"
+            >
+              <p className="text-lg mb-1">💌</p>
+              <p className="font-serif text-base text-textprimary">
+                See partner&apos;s answers
+              </p>
+              <p className="text-xs text-textsecondary mt-1">
+                You&apos;ve answered all 7 — tap to reveal
+              </p>
+            </button>
+          </motion.div>
+        )}
+
         {/* Questions */}
         {questions.map((q, i) => (
           <QuestionCard
@@ -184,17 +179,16 @@ export default function DailyPage() {
             currentUserId={profile?.id || ""}
             index={i}
             onAnswer={handleAnswer}
-            onFavorite={handleFavorite}
           />
         ))}
 
         {/* Completion message */}
-        {allBothAnswered && (
+        {allMyAnswered && (
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.6, delay: 0.3 }}
-            className="text-center py-8"
+            className="text-center py-6"
           >
             <p className="text-2xl mb-3">&#10024;</p>
             <p className="font-serif text-lg text-textprimary">

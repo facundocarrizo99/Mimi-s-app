@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 
+export const dynamic = "force-dynamic";
+
 // GET: Get all couples for the logged-in user
 export async function GET() {
   const supabase = await createClient();
