@@ -6,7 +6,7 @@ export async function POST(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { emoji, reflection, date } = await request.json();
+  const { emoji, reflection, date, couple_id: bodyCouple } = await request.json();
 
   const { data: profile } = await supabase
     .from("users")
@@ -14,7 +14,9 @@ export async function POST(request: NextRequest) {
     .eq("id", user.id)
     .single();
 
-  if (!profile?.couple_id) {
+  const resolvedCoupleId = bodyCouple || profile?.couple_id;
+
+  if (!resolvedCoupleId) {
     return NextResponse.json({ error: "No couple found" }, { status: 404 });
   }
 
@@ -23,7 +25,7 @@ export async function POST(request: NextRequest) {
     .upsert(
       {
         user_id: user.id,
-        couple_id: profile.couple_id,
+        couple_id: resolvedCoupleId,
         mood_date: date,
         emoji,
         reflection: reflection || null,
@@ -47,6 +49,7 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url);
   const date = searchParams.get("date");
+  const coupleIdParam = searchParams.get("couple_id");
 
   const { data: profile } = await supabase
     .from("users")
@@ -54,14 +57,16 @@ export async function GET(request: NextRequest) {
     .eq("id", user.id)
     .single();
 
-  if (!profile?.couple_id) {
+  const resolvedCoupleId = coupleIdParam || profile?.couple_id;
+
+  if (!resolvedCoupleId) {
     return NextResponse.json({ error: "No couple found" }, { status: 404 });
   }
 
   let query = supabase
     .from("moods")
     .select("*")
-    .eq("couple_id", profile.couple_id)
+    .eq("couple_id", resolvedCoupleId)
     .order("mood_date", { ascending: false });
 
   if (date) {

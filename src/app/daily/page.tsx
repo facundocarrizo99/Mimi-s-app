@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import { AppShell } from "@/components/layout/AppShell";
@@ -16,12 +17,14 @@ export default function DailyPage() {
   const [loading, setLoading] = useState(true);
   const [couple, setCouple] = useState<Couple | null>(null);
   const [profile, setProfile] = useState<User | null>(null);
-  const [needsSetup, setNeedsSetup] = useState(false);
   const [currentMood, setCurrentMood] = useState<{
     emoji: string;
     reflection: string | null;
   } | null>(null);
 
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const coupleId = searchParams.get("couple");
   const supabase = createClient();
 
   const loadData = useCallback(async () => {
@@ -31,35 +34,31 @@ export default function DailyPage() {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) {
-      window.location.href = "/auth/login";
+      router.push("/auth/login");
       return;
     }
 
-    // Get profile and couple info
+    if (!coupleId) {
+      router.push("/couples");
+      return;
+    }
+
+    // Get profile info
     const coupleRes = await fetch("/api/couple");
     const coupleData = await coupleRes.json();
-
-    if (!coupleData.user?.couple_id) {
-      setNeedsSetup(true);
-      setProfile(coupleData.user);
-      setLoading(false);
-      return;
-    }
-
-    setNeedsSetup(false);
     setProfile(coupleData.user);
 
     // Get couple details
     const { data: coupleDetail } = await supabase
       .from("couples")
       .select("*")
-      .eq("id", coupleData.user.couple_id)
+      .eq("id", coupleId)
       .single();
 
     setCouple(coupleDetail);
 
-    // Get today's questions
-    const questionsRes = await fetch("/api/daily-questions");
+    // Get today's questions for this couple
+    const questionsRes = await fetch(`/api/daily-questions?couple_id=${coupleId}`);
     const questionsData = await questionsRes.json();
 
     if (questionsData.questions) {
@@ -69,7 +68,7 @@ export default function DailyPage() {
 
     // Get today's mood
     if (questionsData.date) {
-      const moodRes = await fetch(`/api/mood?date=${questionsData.date}`);
+      const moodRes = await fetch(`/api/mood?date=${questionsData.date}&couple_id=${coupleId}`);
       const moodData = await moodRes.json();
       const myMood = moodData.moods?.find(
         (m: { user_id: string }) => m.user_id === user.id
@@ -80,7 +79,7 @@ export default function DailyPage() {
     }
 
     setLoading(false);
-  }, [supabase]);
+  }, [supabase, coupleId, router]);
 
   useEffect(() => {
     loadData();
@@ -93,17 +92,17 @@ export default function DailyPage() {
       body: JSON.stringify({ daily_question_id: dailyQuestionId, text }),
     });
     // Reload to get updated answers
-    const questionsRes = await fetch("/api/daily-questions");
+    const questionsRes = await fetch(`/api/daily-questions?couple_id=${coupleId}`);
     const questionsData = await questionsRes.json();
     if (questionsData.questions) {
       setQuestions(questionsData.questions);
     }
     // Reload couple for streak
-    if (profile?.couple_id) {
+    if (coupleId) {
       const { data: coupleDetail } = await supabase
         .from("couples")
         .select("*")
-        .eq("id", profile.couple_id)
+        .eq("id", coupleId)
         .single();
       setCouple(coupleDetail);
     }
@@ -142,23 +141,19 @@ export default function DailyPage() {
     await fetch("/api/mood", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ emoji, reflection, date }),
+      body: JSON.stringify({ emoji, reflection, date, couple_id: coupleId }),
     });
     setCurrentMood({ emoji, reflection });
   }
 
   if (loading) return <Loading />;
 
-  if (needsSetup) {
-    return <SetupFlow profile={profile} onComplete={loadData} />;
-  }
-
   const allBothAnswered =
     questions.length === 7 &&
     questions.every((q) => q.answers.length >= 2);
 
   return (
-    <AppShell streakCount={couple?.streak_count}>
+    <AppShell streakCount={couple?.streak_count} coupleId={coupleId || undefined}>
       <div className="space-y-5">
         {/* Date & streak */}
         <motion.div
@@ -209,201 +204,5 @@ export default function DailyPage() {
         )}
       </div>
     </AppShell>
-  );
-}
-
-// ============================================================
-// Setup Flow — Create or Join a Couple Space
-// ============================================================
-
-function SetupFlow({
-  profile,
-  onComplete,
-}: {
-  profile: User | null;
-  onComplete: () => void;
-}) {
-  const [mode, setMode] = useState<"choose" | "create" | "join">("choose");
-  const [inviteCode, setInviteCode] = useState("");
-  const [createdCode, setCreatedCode] = useState("");
-  const [displayName, setDisplayName] = useState(profile?.display_name || "");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  async function handleCreate() {
-    setLoading(true);
-    setError("");
-
-    const res = await fetch("/api/couple", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "create", display_name: displayName.trim() }),
-    });
-    const data = await res.json();
-
-    if (data.error) {
-      setError(data.error);
-      setLoading(false);
-      return;
-    }
-
-    setCreatedCode(data.couple.invite_code);
-    setLoading(false);
-  }
-
-  async function handleJoin() {
-    setLoading(true);
-    setError("");
-
-    const res = await fetch("/api/couple", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "join",
-        invite_code: inviteCode.trim(),
-        display_name: displayName.trim(),
-      }),
-    });
-    const data = await res.json();
-
-    if (data.error) {
-      setError(data.error);
-      setLoading(false);
-      return;
-    }
-
-    onComplete();
-  }
-
-  return (
-    <div className="min-h-screen flex items-center justify-center px-4">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
-        className="w-full max-w-sm"
-      >
-        <div className="text-center mb-8">
-          <h1 className="font-serif text-2xl text-textprimary mb-1">
-            Welcome
-          </h1>
-          <p className="text-textsecondary text-sm">
-            Let&apos;s get you set up.
-          </p>
-        </div>
-
-        <div className="rounded-2xl bg-white/70 backdrop-blur-sm p-6 shadow-sm border border-white/50 space-y-4">
-          {/* Display name */}
-          <div>
-            <label className="block text-sm text-textsecondary mb-1">
-              Your name
-            </label>
-            <input
-              type="text"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              placeholder="Your name"
-              className="w-full px-4 py-2.5 rounded-xl bg-white/60 border border-white/50 text-textprimary placeholder:text-textmuted focus:outline-none focus:ring-2 focus:ring-rose/30 transition text-sm"
-            />
-          </div>
-
-          {mode === "choose" && (
-            <div className="space-y-3 pt-2">
-              <button
-                onClick={() => setMode("create")}
-                className="w-full text-left p-4 rounded-xl bg-blush/30 hover:bg-blush/50 transition"
-              >
-                <p className="text-sm font-medium text-textprimary">
-                  Create a new space
-                </p>
-                <p className="text-xs text-textsecondary mt-0.5">
-                  Get an invite code to share with your partner
-                </p>
-              </button>
-              <button
-                onClick={() => setMode("join")}
-                className="w-full text-left p-4 rounded-xl bg-lavender/30 hover:bg-lavender/50 transition"
-              >
-                <p className="text-sm font-medium text-textprimary">
-                  Join your partner&apos;s space
-                </p>
-                <p className="text-xs text-textsecondary mt-0.5">
-                  Enter the invite code they shared
-                </p>
-              </button>
-            </div>
-          )}
-
-          {mode === "create" && !createdCode && (
-            <div className="pt-2">
-              <button
-                onClick={handleCreate}
-                disabled={loading}
-                className="w-full px-4 py-2.5 rounded-xl bg-rose/80 hover:bg-rose text-white text-sm font-medium transition disabled:opacity-50"
-              >
-                {loading ? "Creating..." : "Create space"}
-              </button>
-            </div>
-          )}
-
-          {mode === "create" && createdCode && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="text-center pt-2"
-            >
-              <p className="text-sm text-textsecondary mb-3">
-                Share this code with your partner:
-              </p>
-              <div className="text-2xl font-mono tracking-widest text-textprimary bg-white/50 rounded-xl p-4 mb-3">
-                {createdCode}
-              </div>
-              <button
-                onClick={onComplete}
-                className="mt-4 text-sm text-rose-dark hover:text-rose transition"
-              >
-                They&apos;ve joined &mdash; continue
-              </button>
-            </motion.div>
-          )}
-
-          {mode === "join" && (
-            <div className="space-y-3 pt-2">
-              <input
-                type="text"
-                value={inviteCode}
-                onChange={(e) => setInviteCode(e.target.value)}
-                placeholder="Enter invite code"
-                className="w-full px-4 py-2.5 rounded-xl bg-white/60 border border-white/50 text-textprimary placeholder:text-textmuted focus:outline-none focus:ring-2 focus:ring-rose/30 transition text-sm font-mono tracking-wider text-center"
-              />
-              <button
-                onClick={handleJoin}
-                disabled={loading || !inviteCode.trim()}
-                className="w-full px-4 py-2.5 rounded-xl bg-rose/80 hover:bg-rose text-white text-sm font-medium transition disabled:opacity-50"
-              >
-                {loading ? "Joining..." : "Join"}
-              </button>
-            </div>
-          )}
-
-          {error && (
-            <p className="text-rose-dark text-sm text-center">{error}</p>
-          )}
-
-          {mode !== "choose" && !createdCode && (
-            <button
-              onClick={() => setMode("choose")}
-              className="text-xs text-textmuted hover:text-textsecondary transition block mx-auto"
-            >
-              Back
-            </button>
-          )}
-        </div>
-
-        <p className="text-textmuted text-xs text-center mt-4">
-          Just you two.
-        </p>
-      </motion.div>
-    </div>
   );
 }

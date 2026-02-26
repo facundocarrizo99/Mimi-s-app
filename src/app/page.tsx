@@ -16,7 +16,7 @@ export default function Home() {
         data: { user },
       } = await supabase.auth.getUser();
       if (user) {
-        router.push("/daily");
+        router.push("/couples");
       } else {
         setChecking(false);
       }

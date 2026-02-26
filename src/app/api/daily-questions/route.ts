@@ -1,8 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { DAILY_STRUCTURE } from "@/lib/questions";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const supabase = await createClient();
 
   const {
@@ -12,19 +12,35 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Get user's couple
+  // Read couple_id from query params, fall back to profile
+  const { searchParams } = new URL(request.url);
+  const coupleIdParam = searchParams.get("couple_id");
+
   const { data: profile } = await supabase
     .from("users")
     .select("couple_id, timezone")
     .eq("id", user.id)
     .single();
 
-  if (!profile?.couple_id) {
+  const couple_id = coupleIdParam || profile?.couple_id;
+
+  if (!couple_id) {
     return NextResponse.json({ error: "No couple found" }, { status: 404 });
   }
 
-  const couple_id = profile.couple_id;
-  const timezone = profile.timezone || "America/New_York";
+  // Verify user belongs to this couple
+  const { data: coupleCheck } = await supabase
+    .from("couples")
+    .select("id, timezone")
+    .eq("id", couple_id)
+    .or(`user_1_id.eq.${user.id},user_2_id.eq.${user.id}`)
+    .single();
+
+  if (!coupleCheck) {
+    return NextResponse.json({ error: "Not authorized for this couple" }, { status: 403 });
+  }
+
+  const timezone = coupleCheck.timezone || profile?.timezone || "America/New_York";
 
   // Get today's date in the couple's timezone
   const today = getDateInTimezone(timezone);

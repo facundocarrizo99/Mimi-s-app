@@ -7,15 +7,16 @@ import { cn } from "@/lib/utils";
 interface AppShellProps {
   children: React.ReactNode;
   streakCount?: number;
+  coupleId?: string;
 }
 
-export function AppShell({ children, streakCount }: AppShellProps) {
+export function AppShell({ children, streakCount, coupleId }: AppShellProps) {
   const pathname = usePathname();
 
   const navItems = [
-    { href: "/daily", label: "Today", icon: "&#9728;&#65039;" },
-    { href: "/memory", label: "Memory Book", icon: "&#128214;" },
-    { href: "/settings", label: "Settings", icon: "&#9881;&#65039;" },
+    { href: "/couples", matchPath: "/couples", label: "Spaces", icon: "&#128149;" },
+    { href: coupleId ? `/daily?couple=${coupleId}` : "/couples", matchPath: "/daily", label: "Today", icon: "&#9728;&#65039;" },
+    { href: "/settings", matchPath: "/settings", label: "Settings", icon: "&#9881;&#65039;" },
   ];
 
   return (
@@ -23,7 +24,7 @@ export function AppShell({ children, streakCount }: AppShellProps) {
       {/* Header */}
       <header className="sticky top-0 z-40 backdrop-blur-md bg-white/30 border-b border-white/30">
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
-          <Link href="/daily" className="font-serif text-xl text-textprimary">
+          <Link href="/couples" className="font-serif text-xl text-textprimary">
             Ours
           </Link>
           {streakCount !== undefined && streakCount > 0 && (
@@ -48,7 +49,7 @@ export function AppShell({ children, streakCount }: AppShellProps) {
               href={item.href}
               className={cn(
                 "flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-xl transition-colors",
-                pathname === item.href || pathname.startsWith(item.href + "/")
+                pathname === item.matchPath || pathname.startsWith(item.matchPath + "/")
                   ? "text-rose-dark"
                   : "text-textmuted hover:text-textsecondary"
               )}
