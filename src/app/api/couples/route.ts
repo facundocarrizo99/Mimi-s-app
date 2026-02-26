@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 
 // GET: Get all couples for the logged-in user
 export async function GET() {
@@ -21,6 +21,11 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  // Use service client for partner lookups (RLS on users table
+  // only allows reading partners via the single couple_id field,
+  // which breaks in a multi-couple scenario)
+  const serviceClient = await createServiceClient();
+
   // For each couple, get partner info and today's progress
   const couplesWithDetails = await Promise.all(
     (couples || []).map(async (couple) => {
@@ -29,7 +34,7 @@ export async function GET() {
       let partner = null;
 
       if (partnerId) {
-        const { data: partnerData } = await supabase
+        const { data: partnerData } = await serviceClient
           .from("users")
           .select("id, display_name, email")
           .eq("id", partnerId)

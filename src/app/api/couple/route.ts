@@ -29,7 +29,8 @@ export async function GET() {
     if (couple) {
       const partnerId = couple.user_1_id === user.id ? couple.user_2_id : couple.user_1_id;
       if (partnerId) {
-        const { data: partnerData } = await supabase
+        const serviceClient = await createServiceClient();
+        const { data: partnerData } = await serviceClient
           .from("users")
           .select("id, display_name, email")
           .eq("id", partnerId)
