@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { DAILY_STRUCTURE } from "@/lib/questions";
 
 export async function GET() {
@@ -126,8 +126,9 @@ export async function GET() {
     }
   }
 
-  // Insert daily questions
-  const { error: insertError } = await supabase
+  // Insert daily questions (use service client — no INSERT RLS policy on daily_questions)
+  const serviceClient = await createServiceClient();
+  const { error: insertError } = await serviceClient
     .from("daily_questions")
     .insert(newDailyQuestions);
 

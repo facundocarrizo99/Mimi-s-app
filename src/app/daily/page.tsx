@@ -25,6 +25,8 @@ export default function DailyPage() {
   const supabase = createClient();
 
   const loadData = useCallback(async () => {
+    setLoading(true);
+
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -44,6 +46,7 @@ export default function DailyPage() {
       return;
     }
 
+    setNeedsSetup(false);
     setProfile(coupleData.user);
 
     // Get couple details
@@ -227,26 +230,14 @@ function SetupFlow({
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const supabase = createClient();
-
-  async function updateName() {
-    if (displayName.trim() && profile) {
-      await supabase
-        .from("users")
-        .update({ display_name: displayName.trim() })
-        .eq("id", profile.id);
-    }
-  }
-
   async function handleCreate() {
     setLoading(true);
     setError("");
-    await updateName();
 
     const res = await fetch("/api/couple", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "create" }),
+      body: JSON.stringify({ action: "create", display_name: displayName.trim() }),
     });
     const data = await res.json();
 
@@ -263,12 +254,15 @@ function SetupFlow({
   async function handleJoin() {
     setLoading(true);
     setError("");
-    await updateName();
 
     const res = await fetch("/api/couple", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "join", invite_code: inviteCode.trim() }),
+      body: JSON.stringify({
+        action: "join",
+        invite_code: inviteCode.trim(),
+        display_name: displayName.trim(),
+      }),
     });
     const data = await res.json();
 

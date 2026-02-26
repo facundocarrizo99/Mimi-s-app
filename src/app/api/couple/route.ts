@@ -9,7 +9,7 @@ export async function GET() {
 
   const { data: profile } = await supabase
     .from("users")
-    .select("*, couple:couples(*)")
+    .select("*")
     .eq("id", user.id)
     .single();
 
@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { action, invite_code, timezone } = await request.json();
+  const { action, invite_code, timezone, display_name } = await request.json();
 
   if (action === "create") {
     // Ensure user profile exists in public.users before creating couple
@@ -61,9 +61,10 @@ export async function POST(request: NextRequest) {
           id: user.id,
           email: user.email ?? "",
           display_name:
-            user.user_metadata?.display_name ??
+            display_name ||
+            (user.user_metadata?.display_name ??
             user.email?.split("@")[0] ??
-            "",
+            ""),
         },
         { onConflict: "id" }
       );
@@ -101,8 +102,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invite code required" }, { status: 400 });
     }
 
+    // Use service client to bypass RLS — user 2 isn't a couple member yet
+    const serviceClient = await createServiceClient();
+
+    // Ensure user 2 profile exists with display name
+    await serviceClient
+      .from("users")
+      .upsert(
+        {
+          id: user.id,
+          email: user.email ?? "",
+          display_name:
+            display_name ||
+            (user.user_metadata?.display_name ??
+            user.email?.split("@")[0] ??
+            ""),
+        },
+        { onConflict: "id" }
+      );
+
     // Find couple by invite code
-    const { data: couple } = await supabase
+    const { data: couple } = await serviceClient
       .from("couples")
       .select("*")
       .eq("invite_code", invite_code)
@@ -121,7 +141,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Join the couple
-    const { error } = await supabase
+    const { error } = await serviceClient
       .from("couples")
       .update({ user_2_id: user.id })
       .eq("id", couple.id);
@@ -131,7 +151,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Update user's couple_id
-    await supabase
+    await serviceClient
       .from("users")
       .update({ couple_id: couple.id })
       .eq("id", user.id);
