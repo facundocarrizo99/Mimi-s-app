@@ -79,7 +79,10 @@ export async function GET() {
     })
   );
 
-  return NextResponse.json({ couples: couplesWithDetails });
+  return NextResponse.json(
+    { couples: couplesWithDetails },
+    { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } }
+  );
 }
 
 function getDateInTimezone(timezone: string): string {

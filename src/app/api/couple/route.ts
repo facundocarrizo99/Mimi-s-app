@@ -42,7 +42,10 @@ export async function GET() {
     }
   }
 
-  return NextResponse.json({ user: profile, partner });
+  return NextResponse.json(
+    { user: profile, partner },
+    { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } }
+  );
 }
 
 // POST: Create couple or join via invite code

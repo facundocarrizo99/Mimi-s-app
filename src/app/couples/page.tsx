@@ -63,7 +63,7 @@ export default function CouplesPage() {
       setDisplayName(profileData.display_name || "");
     }
 
-    const res = await fetch("/api/couples");
+    const res = await fetch("/api/couples", { cache: "no-store" });
     const data = await res.json();
     const fetchedCouples: CoupleWithPartner[] = data.couples || [];
 

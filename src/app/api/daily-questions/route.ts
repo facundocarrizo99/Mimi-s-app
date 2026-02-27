@@ -60,7 +60,8 @@ export async function GET(request: NextRequest) {
     // Use service client to bypass RLS — we already verified couple membership above
     const serviceClient = await createServiceClient();
     const questionIds = existing.map((dq) => dq.id);
-    const { data: answers } = await serviceClient
+    
+    const { data: answers, error: answersError } = await serviceClient
       .from("answers")
       .select("*")
       .in("daily_question_id", questionIds);
@@ -77,7 +78,12 @@ export async function GET(request: NextRequest) {
       favorites: (favorites || []).filter((f) => f.daily_question_id === dq.id),
     }));
 
-    return NextResponse.json({ questions: withDetails, date: today });
+    console.log("[daily-questions] answers attached:", withDetails.reduce((sum, q) => sum + q.answers.length, 0));
+
+    return NextResponse.json(
+      { questions: withDetails, date: today },
+      { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } }
+    );
   }
 
   // Generate new daily questions
@@ -162,7 +168,10 @@ export async function GET(request: NextRequest) {
       .order("position");
 
     if (retryExisting && retryExisting.length > 0) {
-      return NextResponse.json({ questions: retryExisting, date: today });
+      return NextResponse.json(
+        { questions: retryExisting, date: today },
+        { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } }
+      );
     }
 
     return NextResponse.json(
@@ -185,7 +194,10 @@ export async function GET(request: NextRequest) {
     favorites: [],
   }));
 
-  return NextResponse.json({ questions: withDetails, date: today });
+  return NextResponse.json(
+    { questions: withDetails, date: today },
+    { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } }
+  );
 }
 
 function getDateInTimezone(timezone: string): string {

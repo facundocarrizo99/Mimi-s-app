@@ -47,33 +47,42 @@ export default function AnswersPage() {
 
     setCurrentUserId(user.id);
 
-    // Get couple details
+    // Couple
     const { data: coupleDetail } = await supabase
       .from("couples")
       .select("*")
       .eq("id", coupleId)
       .single();
-
     setCouple(coupleDetail);
 
-    // Get partner name
-    const coupleRes = await fetch("/api/couples");
-    const coupleData = await coupleRes.json();
-    const thisCpl = (coupleData.couples || []).find(
-      (c: { id: string }) => c.id === coupleId
-    );
-    if (thisCpl?.partner) {
-      setPartnerName(thisCpl.partner.display_name || thisCpl.partner.email);
+    // Partner name — try direct query, fall back to "Them"
+    if (coupleDetail) {
+      const partnerId =
+        coupleDetail.user_1_id === user.id
+          ? coupleDetail.user_2_id
+          : coupleDetail.user_1_id;
+      if (partnerId) {
+        const { data: partnerProfile } = await supabase
+          .from("users")
+          .select("display_name, email")
+          .eq("id", partnerId)
+          .single();
+        if (partnerProfile) {
+          setPartnerName(
+            partnerProfile.display_name || partnerProfile.email || ""
+          );
+        }
+      }
     }
 
-    // Get today's questions
-    const questionsRes = await fetch(
-      `/api/daily-questions?couple_id=${coupleId}`
-    );
-    const questionsData = await questionsRes.json();
+    // Questions + answers — API returns everything via service client (bypasses RLS)
+    // Just trust the API response. Do NOT re-query answers from browser.
+    const res = await fetch(`/api/daily-questions?couple_id=${coupleId}`);
+    const data = await res.json();
 
-    if (questionsData.questions) {
-      const qs: DailyQuestionWithDetails[] = questionsData.questions;
+    if (data.questions) {
+      const qs: DailyQuestionWithDetails[] = data.questions;
+      setDate(data.date);
 
       // Check if user has answered all questions
       const myAnswerCount = qs.filter((q) =>
@@ -87,11 +96,11 @@ export default function AnswersPage() {
       }
 
       setQuestions(qs);
-      setDate(questionsData.date);
     }
 
     setLoading(false);
-  }, [supabase, coupleId, router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [coupleId]);
 
   useEffect(() => {
     loadData();

@@ -9,14 +9,19 @@ import { QuestionCard } from "@/components/daily/QuestionCard";
 import { MoodSelector } from "@/components/daily/MoodSelector";
 import { Loading } from "@/components/ui/Loading";
 import { getStreakMessage, formatDate } from "@/lib/utils";
-import type { DailyQuestionWithDetails, Couple, User } from "@/types/database";
+import { getCategoryLabel, getCategoryColor } from "@/lib/questions";
+import type {
+  DailyQuestionWithDetails,
+  Couple,
+  QuestionCategory,
+} from "@/types/database";
 
 export default function DailyPage() {
   const [questions, setQuestions] = useState<DailyQuestionWithDetails[]>([]);
   const [date, setDate] = useState("");
   const [loading, setLoading] = useState(true);
   const [couple, setCouple] = useState<Couple | null>(null);
-  const [profile, setProfile] = useState<User | null>(null);
+  const [userId, setUserId] = useState("");
   const [currentMood, setCurrentMood] = useState<{
     emoji: string;
     reflection: string | null;
@@ -43,60 +48,63 @@ export default function DailyPage() {
       return;
     }
 
-    // Get profile info
-    const coupleRes = await fetch("/api/couple");
-    const coupleData = await coupleRes.json();
-    setProfile(coupleData.user);
+    setUserId(user.id);
 
-    // Get couple details
+    // Couple
     const { data: coupleDetail } = await supabase
       .from("couples")
       .select("*")
       .eq("id", coupleId)
       .single();
-
     setCouple(coupleDetail);
 
-    // Get today's questions for this couple
-    const questionsRes = await fetch(`/api/daily-questions?couple_id=${coupleId}`);
-    const questionsData = await questionsRes.json();
+    // Questions + answers from API (uses service client, bypasses RLS)
+    const res = await fetch(`/api/daily-questions?couple_id=${coupleId}`);
+    const data = await res.json();
 
-    if (questionsData.questions) {
-      setQuestions(questionsData.questions);
-      setDate(questionsData.date);
+    if (data.questions) {
+      setQuestions(data.questions);
+      setDate(data.date);
     }
 
-    // Get today's mood
-    if (questionsData.date) {
-      const moodRes = await fetch(`/api/mood?date=${questionsData.date}&couple_id=${coupleId}`);
-      const moodData = await moodRes.json();
-      const myMood = moodData.moods?.find(
-        (m: { user_id: string }) => m.user_id === user.id
-      );
-      if (myMood) {
-        setCurrentMood({ emoji: myMood.emoji, reflection: myMood.reflection });
+    // Mood
+    if (data.date) {
+      const { data: moodRow } = await supabase
+        .from("moods")
+        .select("*")
+        .eq("couple_id", coupleId)
+        .eq("mood_date", data.date)
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (moodRow) {
+        setCurrentMood({ emoji: moodRow.emoji, reflection: moodRow.reflection });
       }
     }
 
     setLoading(false);
-  }, [supabase, coupleId, router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [coupleId]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
 
   async function handleAnswer(dailyQuestionId: string, text: string) {
+    // Save answer
     await fetch("/api/daily-questions/answer", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ daily_question_id: dailyQuestionId, text }),
     });
-    // Reload to get updated answers
-    const questionsRes = await fetch(`/api/daily-questions?couple_id=${coupleId}`);
-    const questionsData = await questionsRes.json();
-    if (questionsData.questions) {
-      setQuestions(questionsData.questions);
+
+    // Reload everything from API — answers come back via service client
+    const res = await fetch(`/api/daily-questions?couple_id=${coupleId}`);
+    const data = await res.json();
+    if (data.questions) {
+      setQuestions(data.questions);
     }
+
     // Reload couple for streak
     if (coupleId) {
       const { data: coupleDetail } = await supabase
@@ -122,8 +130,93 @@ export default function DailyPage() {
   const allMyAnswered =
     questions.length === 7 &&
     questions.every((q) =>
-      q.answers.some((a) => a.user_id === profile?.id)
+      q.answers.some((a) => a.user_id === userId)
     );
+
+  // Completed view — can't re-answer, just see own answers + link to partner's
+  if (allMyAnswered) {
+    return (
+      <AppShell streakCount={couple?.streak_count} coupleId={coupleId || undefined}>
+        <div className="space-y-5">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="text-center mb-2"
+          >
+            <h2 className="font-serif text-2xl text-textprimary mb-1">
+              {formatDate(date)}
+            </h2>
+            <p className="text-sm text-textsecondary">
+              {getStreakMessage(couple?.streak_count || 0)}
+            </p>
+          </motion.div>
+
+          {/* Mood selector */}
+          <MoodSelector
+            date={date}
+            currentMood={currentMood || undefined}
+            onSubmit={handleMood}
+          />
+
+          {/* Completed banner + see partner's answers */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="text-center py-4"
+          >
+            <p className="text-3xl mb-3">&#10024;</p>
+            <p className="font-serif text-xl text-textprimary mb-1">
+              All done for today
+            </p>
+            <p className="text-sm text-textsecondary mb-6">
+              You answered all 7 questions.
+            </p>
+            <button
+              onClick={() => router.push(`/answers?couple=${coupleId}`)}
+              className="inline-flex items-center gap-2 px-8 py-3 rounded-xl bg-lavender/50 hover:bg-lavender/70 text-textprimary font-medium transition-all duration-200"
+            >
+              <span>💌</span>
+              See partner&apos;s answers
+            </button>
+          </motion.div>
+
+          {/* Read-only answers summary */}
+          {questions.map((q, i) => {
+            const category = q.question?.category as QuestionCategory;
+            const myAnswer = q.answers.find((a) => a.user_id === userId);
+            return (
+              <motion.div
+                key={q.id}
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: i * 0.06 }}
+                className="rounded-2xl bg-white/70 backdrop-blur-sm shadow-sm border border-white/50 p-6"
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <span
+                    className={`text-xs px-2.5 py-1 rounded-full font-medium ${getCategoryColor(category)}`}
+                  >
+                    {getCategoryLabel(category)}
+                  </span>
+                  <span className="text-textmuted text-xs">{q.position}/7</span>
+                </div>
+                <p className="font-serif text-lg text-textprimary leading-relaxed mb-4">
+                  {q.question?.text}
+                </p>
+                <div className="rounded-xl bg-blush/30 p-4">
+                  <p className="text-xs text-textmuted mb-1">You wrote</p>
+                  <p className="text-sm text-textprimary leading-relaxed">
+                    {myAnswer?.text}
+                  </p>
+                </div>
+              </motion.div>
+            );
+          })}
+        </div>
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell streakCount={couple?.streak_count} coupleId={coupleId || undefined}>
@@ -149,53 +242,16 @@ export default function DailyPage() {
           onSubmit={handleMood}
         />
 
-        {/* See partner's answers button — only when user answered all 7 */}
-        {allMyAnswered && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-          >
-            <button
-              onClick={() => router.push(`/answers?couple=${coupleId}`)}
-              className="w-full rounded-2xl bg-lavender/40 hover:bg-lavender/60 backdrop-blur-sm border border-white/50 p-5 transition-all duration-200 text-center"
-            >
-              <p className="text-lg mb-1">💌</p>
-              <p className="font-serif text-base text-textprimary">
-                See partner&apos;s answers
-              </p>
-              <p className="text-xs text-textsecondary mt-1">
-                You&apos;ve answered all 7 — tap to reveal
-              </p>
-            </button>
-          </motion.div>
-        )}
-
         {/* Questions */}
         {questions.map((q, i) => (
           <QuestionCard
             key={q.id}
             dailyQuestion={q}
-            currentUserId={profile?.id || ""}
+            currentUserId={userId}
             index={i}
             onAnswer={handleAnswer}
           />
         ))}
-
-        {/* Completion message */}
-        {allMyAnswered && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.6, delay: 0.3 }}
-            className="text-center py-6"
-          >
-            <p className="text-2xl mb-3">&#10024;</p>
-            <p className="font-serif text-lg text-textprimary">
-              All done for today.
-            </p>
-          </motion.div>
-        )}
       </div>
     </AppShell>
   );
