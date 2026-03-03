@@ -16,6 +16,7 @@ export function AppShell({ children, streakCount, coupleId }: AppShellProps) {
   const navItems = [
     { href: "/couples", matchPath: "/couples", label: "Spaces", icon: "&#128149;" },
     { href: coupleId ? `/daily?couple=${coupleId}` : "/couples", matchPath: "/daily", label: "Today", icon: "&#9728;&#65039;" },
+    { href: coupleId ? `/past-days?couple=${coupleId}` : "/couples", matchPath: "/past-days", label: "Past Days", icon: "&#128218;" },
     { href: "/settings", matchPath: "/settings", label: "Settings", icon: "&#9881;&#65039;" },
   ];
 

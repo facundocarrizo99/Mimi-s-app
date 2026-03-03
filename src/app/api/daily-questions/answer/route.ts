@@ -67,19 +67,31 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Get today's date from the daily question
+  // Check if this answer completes today's set for both users.
+  // Only update the streak for today's questions — answering past-day
+  // questions must NOT touch the streak to avoid overwriting
+  // last_streak_date with an old date (which would break the streak).
+  const { data: coupleForTz } = await serviceClient
+    .from("couples")
+    .select("timezone")
+    .eq("id", dq.couple_id)
+    .single();
+
+  const timezone = coupleForTz?.timezone || "America/New_York";
+  const today = getDateInTimezone(timezone);
+
   const { data: fullDq } = await serviceClient
     .from("daily_questions")
     .select("question_date")
     .eq("id", daily_question_id)
     .single();
 
-  if (fullDq) {
+  if (fullDq && fullDq.question_date === today) {
     const { data: allTodayQuestions } = await serviceClient
       .from("daily_questions")
       .select("id")
       .eq("couple_id", dq.couple_id)
-      .eq("question_date", fullDq.question_date);
+      .eq("question_date", today);
 
     if (allTodayQuestions) {
       const qIds = allTodayQuestions.map((q) => q.id);
@@ -98,7 +110,7 @@ export async function POST(request: NextRequest) {
           (a) => a.user_id === couple.user_2_id
         ).length;
 
-        // If both have answered all 7, update streak
+        // If both have answered all 7 today, update streak
         if (
           user1Answers === 7 &&
           user2Answers === 7 &&
@@ -107,7 +119,7 @@ export async function POST(request: NextRequest) {
         ) {
           await serviceClient.rpc("update_streak", {
             p_couple_id: dq.couple_id,
-            p_date: fullDq.question_date,
+            p_date: today,
           });
         }
       }
@@ -115,4 +127,15 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json({ answer });
+}
+
+function getDateInTimezone(timezone: string): string {
+  const now = new Date();
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  return formatter.format(now);
 }
