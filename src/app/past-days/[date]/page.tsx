@@ -94,11 +94,13 @@ export default function PastDayDetailPage() {
   }, [loadData]);
 
   async function handleAnswer(dailyQuestionId: string, text: string) {
-    await fetch("/api/daily-questions/answer", {
+    const saveRes = await fetch("/api/daily-questions/answer", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ daily_question_id: dailyQuestionId, text }),
     });
+
+    if (!saveRes.ok) return;
 
     // Reload questions for this date
     const res = await fetch(
