@@ -29,8 +29,8 @@ export default function Home() {
       <div className="min-h-screen flex items-center justify-center">
         <motion.div
           animate={{ opacity: [0.4, 1, 0.4] }}
-          transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
-          className="text-2xl font-serif text-textprimary"
+          transition={{ duration: 1.1, repeat: Infinity, ease: [0.2, 0, 0, 1] }}
+          className="text-2xl font-semibold text-textprimary"
         >
           Ours
         </motion.div>
@@ -43,12 +43,15 @@ export default function Home() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8 }}
-        className="text-center max-w-md"
+        transition={{ duration: 0.45, ease: [0.2, 0, 0, 1] }}
+        className="text-center max-w-md md3-surface p-8"
       >
-        <h1 className="font-serif text-4xl text-textprimary mb-3">Ours</h1>
+        <div className="w-14 h-14 rounded-2xl bg-[var(--md-sys-color-primary-container)] mx-auto mb-4 grid place-items-center text-2xl">
+          ♡
+        </div>
+        <h1 className="text-4xl font-semibold tracking-tight text-textprimary mb-3">Ours</h1>
 
-        <p className="text-textsecondary text-lg mb-2 font-serif italic">
+        <p className="text-textsecondary text-base mb-1">
           A little space for two.
         </p>
 
@@ -63,7 +66,7 @@ export default function Home() {
         >
           <a
             href="/auth/login"
-            className="inline-flex items-center justify-center px-8 py-3 rounded-xl bg-rose/80 hover:bg-rose text-white font-medium shadow-sm hover:shadow transition-all duration-200"
+            className="inline-flex items-center justify-center px-8 py-3 rounded-full bg-[var(--md-sys-color-primary)] hover:brightness-110 text-[var(--md-sys-color-on-primary)] font-medium shadow-[0_2px_8px_rgba(103,80,164,0.35)] transition-all duration-200"
           >
             Get started
           </a>

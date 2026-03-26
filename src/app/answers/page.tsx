@@ -149,7 +149,7 @@ export default function AnswersPage() {
             className="text-center"
           >
             <p className="text-3xl mb-4">✏️</p>
-            <h2 className="font-serif text-xl text-textprimary mb-2">
+            <h2 className="text-xl font-semibold tracking-tight text-textprimary mb-2">
               Answer first
             </h2>
             <p className="text-sm text-textsecondary mb-6 max-w-xs">
@@ -158,7 +158,7 @@ export default function AnswersPage() {
             </p>
             <button
               onClick={() => router.push(`/daily?couple=${coupleId}`)}
-              className="px-6 py-2.5 rounded-xl bg-rose/80 hover:bg-rose text-white text-sm font-medium transition"
+              className="px-6 py-2.5 rounded-full bg-[var(--md-sys-color-primary)] hover:brightness-110 text-white text-sm font-medium transition"
             >
               Go answer
             </button>
@@ -180,7 +180,7 @@ export default function AnswersPage() {
           animate={{ opacity: 1 }}
           className="text-center mb-2"
         >
-          <h2 className="font-serif text-2xl text-textprimary mb-1">
+          <h2 className="text-2xl font-semibold tracking-tight text-textprimary mb-1">
             {formatDate(date)}
           </h2>
           <p className="text-sm text-textsecondary">
@@ -212,14 +212,14 @@ export default function AnswersPage() {
               </div>
 
               {/* Question */}
-              <p className="font-serif text-lg text-textprimary leading-relaxed mb-4">
+              <p className="text-lg font-medium text-textprimary leading-relaxed mb-4">
                 {q.question?.text}
               </p>
 
               <div className="space-y-3">
                 {/* My answer */}
                 {myAnswer && (
-                  <div className="rounded-xl bg-blush/30 p-4">
+                  <div className="rounded-2xl bg-[var(--md-sys-color-primary-container)]/60 p-4 border border-[var(--md-sys-color-outline-variant)]/40">
                     <p className="text-xs text-textmuted mb-1">You</p>
                     <p className="text-sm text-textprimary leading-relaxed">
                       {myAnswer.text}
@@ -233,7 +233,7 @@ export default function AnswersPage() {
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.4, delay: i * 0.05 + 0.2 }}
-                    className="rounded-xl bg-lavender/30 p-4"
+                      className="rounded-2xl bg-[var(--md-sys-color-secondary-container)]/65 p-4 border border-[var(--md-sys-color-outline-variant)]/40"
                   >
                     <p className="text-xs text-textmuted mb-1">
                       {partnerName || "Them"}

@@ -110,7 +110,7 @@ export default function SettingsPage() {
           animate={{ opacity: 1 }}
           className="text-center mb-2"
         >
-          <h2 className="font-serif text-2xl text-textprimary mb-1">
+          <h2 className="text-2xl font-semibold tracking-tight text-textprimary mb-1">
             Settings
           </h2>
           <p className="text-sm text-textsecondary">Manage your account.</p>
@@ -130,7 +130,7 @@ export default function SettingsPage() {
                 type="text"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-white/50 border border-white/60 text-sm text-textprimary focus:outline-none focus:ring-2 focus:ring-rose/30 transition"
+                className="w-full px-3 py-2.5 rounded-2xl bg-[var(--md-sys-color-surface)] border border-[var(--md-sys-color-outline-variant)]/70 text-sm text-textprimary transition"
               />
             </div>
             <div>
@@ -140,7 +140,7 @@ export default function SettingsPage() {
               <select
                 value={timezone}
                 onChange={(e) => setTimezone(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-white/50 border border-white/60 text-sm text-textprimary focus:outline-none focus:ring-2 focus:ring-rose/30 transition"
+                className="w-full px-3 py-2.5 rounded-2xl bg-[var(--md-sys-color-surface)] border border-[var(--md-sys-color-outline-variant)]/70 text-sm text-textprimary transition"
               >
                 {TIMEZONES.map((tz) => (
                   <option key={tz} value={tz}>
@@ -188,7 +188,7 @@ export default function SettingsPage() {
                   <p className="text-xs text-textsecondary mb-1">
                     Share this invite code with your partner
                   </p>
-                  <div className="font-mono text-lg tracking-widest text-textprimary bg-white/40 rounded-xl p-3 text-center">
+                  <div className="font-mono text-lg tracking-widest text-textprimary bg-[var(--md-sys-color-surface-container-high)] rounded-2xl p-3 text-center">
                     {couple.invite_code}
                   </div>
                 </div>

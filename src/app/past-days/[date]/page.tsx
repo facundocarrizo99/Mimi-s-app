@@ -165,7 +165,7 @@ export default function PastDayDetailPage() {
           animate={{ opacity: 1 }}
           className="text-center mb-2"
         >
-          <h2 className="font-serif text-2xl text-textprimary mb-1">
+          <h2 className="text-2xl font-semibold tracking-tight text-textprimary mb-1">
             {formatDate(date)}
           </h2>
           {allMyAnswered ? (
@@ -226,16 +226,17 @@ export default function PastDayDetailPage() {
           const isFavorited = q.favorites.length > 0;
 
           return (
-            <motion.div
-              key={q.id}
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{
-                duration: 0.5,
-                delay: (unansweredQuestions.length + i) * 0.06,
-              }}
-              className="rounded-2xl bg-white/70 backdrop-blur-sm shadow-sm border border-white/50 p-6"
-            >
+              <motion.div
+                key={q.id}
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{
+                  duration: 0.35,
+                  delay: (unansweredQuestions.length + i) * 0.06,
+                  ease: [0.2, 0, 0, 1],
+                }}
+                className="md3-surface p-6"
+              >
               {/* Category badge */}
               <div className="flex items-center justify-between mb-3">
                 <span
@@ -249,14 +250,14 @@ export default function PastDayDetailPage() {
               </div>
 
               {/* Question */}
-              <p className="font-serif text-lg text-textprimary leading-relaxed mb-4">
+              <p className="text-lg font-medium text-textprimary leading-relaxed mb-4">
                 {q.question?.text}
               </p>
 
               <div className="space-y-3">
                 {/* My answer */}
                 {myAnswer && (
-                  <div className="rounded-xl bg-blush/30 p-4">
+                  <div className="rounded-2xl bg-[var(--md-sys-color-primary-container)]/60 p-4 border border-[var(--md-sys-color-outline-variant)]/40">
                     <p className="text-xs text-textmuted mb-1">You</p>
                     <p className="text-sm text-textprimary leading-relaxed">
                       {myAnswer.text}
@@ -270,7 +271,7 @@ export default function PastDayDetailPage() {
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.4, delay: i * 0.05 + 0.2 }}
-                    className="rounded-xl bg-lavender/30 p-4"
+                      className="rounded-2xl bg-[var(--md-sys-color-secondary-container)]/65 p-4 border border-[var(--md-sys-color-outline-variant)]/40"
                   >
                     <p className="text-xs text-textmuted mb-1">
                       {partnerName || "Them"}
@@ -335,9 +336,9 @@ export default function PastDayDetailPage() {
             className="text-center py-12"
           >
             <p className="text-3xl mb-3">&#128220;</p>
-            <p className="font-serif text-lg text-textprimary mb-1">
-              No questions for this day
-            </p>
+              <p className="text-lg font-medium text-textprimary mb-1">
+                No questions for this day
+              </p>
             <p className="text-sm text-textsecondary">
               Questions weren&apos;t generated for this date.
             </p>

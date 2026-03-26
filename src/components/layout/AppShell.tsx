@@ -22,37 +22,39 @@ export function AppShell({ children, streakCount, coupleId }: AppShellProps) {
 
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Header */}
-      <header className="sticky top-0 z-40 backdrop-blur-md bg-white/30 border-b border-white/30">
-        <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
-          <Link href="/couples" className="font-serif text-xl text-textprimary">
-            Ours
+      <header className="sticky top-0 z-40 backdrop-blur-xl bg-[var(--md-sys-color-surface)]/85 border-b border-[var(--md-sys-color-outline-variant)]/45">
+        <div className="max-w-lg mx-auto px-4 py-3.5 flex items-center justify-between">
+          <Link href="/couples" className="text-xl font-semibold tracking-tight text-textprimary">
+            <span className="inline-flex items-center gap-2">
+              <span className="inline-grid place-items-center w-8 h-8 rounded-full bg-[var(--md-sys-color-primary-container)] text-base">
+                ♡
+              </span>
+              Ours
+            </span>
           </Link>
           {streakCount !== undefined && streakCount > 0 && (
-            <span className="text-sm text-textsecondary flex items-center gap-1.5">
+            <span className="text-xs px-3 py-1 rounded-full bg-[var(--md-sys-color-tertiary-container)] text-textsecondary flex items-center gap-1.5">
               {streakCount} day{streakCount !== 1 ? "s" : ""} ✨
             </span>
           )}
         </div>
       </header>
 
-      {/* Content */}
       <main className="flex-1 max-w-lg mx-auto w-full px-4 py-6">
         {children}
       </main>
 
-      {/* Bottom Navigation */}
-      <nav className="sticky bottom-0 z-40 backdrop-blur-md bg-white/40 border-t border-white/30">
-        <div className="max-w-lg mx-auto px-4 py-2 flex justify-around">
+      <nav className="sticky bottom-0 z-40 backdrop-blur-xl bg-[var(--md-sys-color-surface)]/90 border-t border-[var(--md-sys-color-outline-variant)]/45">
+        <div className="max-w-lg mx-auto px-2 py-1.5 flex justify-around">
           {navItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}
               className={cn(
-                "flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-xl transition-colors",
+                "flex flex-col items-center gap-0.5 px-3 py-2 rounded-2xl transition-colors text-center min-w-16",
                 pathname === item.matchPath || pathname.startsWith(item.matchPath + "/")
-                  ? "text-rose-dark"
-                  : "text-textmuted hover:text-textsecondary"
+                  ? "text-[var(--md-sys-color-primary)] bg-[var(--md-sys-color-primary)]/10"
+                  : "text-textmuted hover:text-textsecondary md3-state-layer"
               )}
             >
               <span

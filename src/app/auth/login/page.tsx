@@ -38,11 +38,14 @@ export default function LoginPage() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
+        transition={{ duration: 0.4, ease: [0.2, 0, 0, 1] }}
         className="w-full max-w-sm"
       >
         <div className="text-center mb-10">
-          <h1 className="font-serif text-3xl text-textprimary mb-2">Ours</h1>
+          <div className="w-12 h-12 rounded-2xl bg-[var(--md-sys-color-primary-container)] mx-auto mb-3 grid place-items-center text-xl">
+            ♡
+          </div>
+          <h1 className="text-3xl font-semibold tracking-tight text-textprimary mb-2">Ours</h1>
           <p className="text-textsecondary text-sm">
             A little space for two.
           </p>
@@ -52,9 +55,9 @@ export default function LoginPage() {
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="text-center rounded-2xl bg-white/70 backdrop-blur-sm p-8 shadow-sm border border-white/50"
+            className="text-center md3-surface p-8"
           >
-            <p className="text-lg text-textprimary mb-2 font-serif">
+            <p className="text-lg text-textprimary mb-2 font-medium">
               Check your inbox
             </p>
             <p className="text-textsecondary text-sm">
@@ -64,7 +67,7 @@ export default function LoginPage() {
         ) : (
           <form
             onSubmit={handleLogin}
-            className="rounded-2xl bg-white/70 backdrop-blur-sm p-8 shadow-sm border border-white/50"
+            className="md3-surface p-8"
           >
             <label className="block mb-1 text-sm text-textsecondary">
               Your email
@@ -75,7 +78,7 @@ export default function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="hello@example.com"
               required
-              className="w-full px-4 py-3 rounded-xl bg-white/60 border border-white/50 text-textprimary placeholder:text-textmuted focus:outline-none focus:ring-2 focus:ring-rose/30 transition mb-4"
+              className="w-full px-4 py-3 rounded-2xl bg-[var(--md-sys-color-surface)] border border-[var(--md-sys-color-outline-variant)]/70 text-textprimary placeholder:text-textmuted transition mb-4"
             />
 
             {error && (

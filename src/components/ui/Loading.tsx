@@ -8,12 +8,15 @@ export function Loading() {
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="text-center"
+        className="text-center md3-surface px-8 py-7 min-w-52"
       >
+        <div className="text-2xl mb-2" aria-hidden>
+          💗
+        </div>
         <motion.div
-          animate={{ opacity: [0.3, 1, 0.3] }}
-          transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
-          className="text-lg font-serif text-textsecondary"
+          animate={{ opacity: [0.55, 1, 0.55] }}
+          transition={{ duration: 1.1, repeat: Infinity, ease: [0.2, 0, 0, 1] }}
+          className="text-base text-textsecondary"
         >
           Loading…
         </motion.div>

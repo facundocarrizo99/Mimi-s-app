@@ -86,7 +86,7 @@ export default function PastDaysPage() {
           animate={{ opacity: 1 }}
           className="text-center mb-2"
         >
-          <h2 className="font-serif text-2xl text-textprimary mb-1">
+          <h2 className="text-2xl font-semibold tracking-tight text-textprimary mb-1">
             Past Days
           </h2>
           <p className="text-sm text-textsecondary">
@@ -118,11 +118,11 @@ export default function PastDaysPage() {
                     `/past-days/${d.date}?couple=${coupleId}`
                   )
                 }
-                className="w-full text-left rounded-2xl bg-white/70 backdrop-blur-sm shadow-sm border border-rose/20 p-5 hover:bg-white/90 hover:shadow-md transition-all duration-200 group"
+                className="w-full text-left md3-surface p-5 hover:brightness-[1.02] transition-all duration-200 group border-[var(--md-sys-color-primary)]/25"
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-serif text-lg text-textprimary group-hover:text-rose-dark transition-colors">
+                    <p className="text-lg font-medium text-textprimary group-hover:text-rose-dark transition-colors">
                       {formatDate(d.date)}
                     </p>
                     <p className="text-xs text-textsecondary mt-1">
@@ -137,8 +137,8 @@ export default function PastDaysPage() {
                           key={qi}
                           className={`w-1.5 h-1.5 rounded-full ${
                             qi < d.myAnswerCount
-                              ? "bg-rose/70"
-                              : "bg-gray-200"
+                              ? "bg-[var(--md-sys-color-primary)]"
+                              : "bg-[var(--md-sys-color-outline-variant)]/50"
                           }`}
                         />
                       ))}
@@ -177,11 +177,11 @@ export default function PastDaysPage() {
                     `/past-days/${d.date}?couple=${coupleId}`
                   )
                 }
-                className="w-full text-left rounded-2xl bg-white/50 backdrop-blur-sm shadow-sm border border-white/40 p-5 hover:bg-white/70 hover:shadow-md transition-all duration-200 group"
+                className="w-full text-left md3-surface p-5 hover:brightness-[1.02] transition-all duration-200 group"
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-serif text-lg text-textprimary">
+                    <p className="text-lg font-medium text-textprimary">
                       {formatDate(d.date)}
                     </p>
                     <p className="text-xs text-textmuted mt-1">
@@ -218,9 +218,9 @@ export default function PastDaysPage() {
             className="text-center py-12"
           >
             <p className="text-3xl mb-3">&#128220;</p>
-            <p className="font-serif text-lg text-textprimary mb-1">
-              No past days yet
-            </p>
+              <p className="text-lg font-medium text-textprimary mb-1">
+                No past days yet
+              </p>
             <p className="text-sm text-textsecondary">
               Come back tomorrow to see today&apos;s questions here.
             </p>
