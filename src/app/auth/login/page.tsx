@@ -93,6 +93,10 @@ export default function LoginPage() {
             >
               {loading ? "Sending..." : "Send magic link"}
             </Button>
+
+            <p className="text-xs text-textmuted text-center mt-3">
+              You can add and use passkeys from Settings after signing in.
+            </p>
           </form>
         )}
       </motion.div>

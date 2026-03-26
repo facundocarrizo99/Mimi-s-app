@@ -43,6 +43,13 @@ export default function SettingsPage() {
   const [timezone, setTimezone] = useState("America/New_York");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [passkeySupported, setPasskeySupported] = useState(false);
+  const [passkeys, setPasskeys] = useState<
+    { id: string; friendly_name?: string | null; created_at?: string; status?: string }[]
+  >([]);
+  const [passkeyBusy, setPasskeyBusy] = useState(false);
+  const [passkeyMessage, setPasskeyMessage] = useState("");
+  const [passkeyError, setPasskeyError] = useState("");
 
   const supabase = createClient();
 
@@ -63,6 +70,15 @@ export default function SettingsPage() {
         .single();
       setCouple(coupleData);
     }
+
+    if (typeof window !== "undefined") {
+      setPasskeySupported(
+        Boolean(window.PublicKeyCredential && navigator.credentials)
+      );
+    }
+
+    const { data: factorData } = await supabase.auth.mfa.listFactors();
+    setPasskeys((factorData?.all || []).filter((f) => f.factor_type === "webauthn"));
 
     setLoading(false);
   }, [supabase]);
@@ -98,6 +114,75 @@ export default function SettingsPage() {
   async function handleSignOut() {
     await supabase.auth.signOut();
     window.location.href = "/auth/login";
+  }
+
+  async function refreshPasskeys() {
+    const { data: factorData } = await supabase.auth.mfa.listFactors();
+    setPasskeys((factorData?.all || []).filter((f) => f.factor_type === "webauthn"));
+  }
+
+  async function handleCreatePasskey() {
+    setPasskeyBusy(true);
+    setPasskeyError("");
+    setPasskeyMessage("");
+
+    const friendlyName = `${displayName?.trim() || "My"} passkey`;
+    const { error } = await supabase.auth.mfa.webauthn.register({
+      friendlyName,
+    });
+
+    if (error) {
+      setPasskeyError(error.message);
+      setPasskeyBusy(false);
+      return;
+    }
+
+    await refreshPasskeys();
+    setPasskeyMessage("Passkey added.");
+    setPasskeyBusy(false);
+  }
+
+  async function handleVerifyPasskey() {
+    setPasskeyBusy(true);
+    setPasskeyError("");
+    setPasskeyMessage("");
+
+    const verifiedPasskey = passkeys.find((p) => p.status === "verified");
+    if (!verifiedPasskey) {
+      setPasskeyError("No verified passkey available yet.");
+      setPasskeyBusy(false);
+      return;
+    }
+
+    const { error } = await supabase.auth.mfa.webauthn.authenticate({
+      factorId: verifiedPasskey.id,
+    });
+
+    if (error) {
+      setPasskeyError(error.message);
+      setPasskeyBusy(false);
+      return;
+    }
+
+    setPasskeyMessage("Passkey verified for this session.");
+    setPasskeyBusy(false);
+  }
+
+  async function handleDeletePasskey(factorId: string) {
+    setPasskeyBusy(true);
+    setPasskeyError("");
+    setPasskeyMessage("");
+
+    const { error } = await supabase.auth.mfa.unenroll({ factorId });
+    if (error) {
+      setPasskeyError(error.message);
+      setPasskeyBusy(false);
+      return;
+    }
+
+    await refreshPasskeys();
+    setPasskeyMessage("Passkey removed.");
+    setPasskeyBusy(false);
   }
 
   if (loading) return <Loading />;
@@ -203,6 +288,71 @@ export default function SettingsPage() {
             </div>
           </Card>
         )}
+
+        <Card delay={0.2}>
+          <h3 className="text-sm font-medium text-textprimary mb-3">Passkeys</h3>
+          {!passkeySupported ? (
+            <p className="text-sm text-textsecondary">
+              This browser doesn&apos;t support passkeys. Use a modern browser or device to enable them.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-xs text-textsecondary">
+                Add a passkey for stronger sign-in security. Keep magic link as backup.
+              </p>
+
+              {passkeys.length === 0 ? (
+                <p className="text-sm text-textmuted">No passkeys registered yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {passkeys.map((passkey) => (
+                    <div
+                      key={passkey.id}
+                      className="rounded-2xl bg-[var(--md-sys-color-surface-container-high)] p-3 border border-[var(--md-sys-color-outline-variant)]/45"
+                    >
+                      <p className="text-sm text-textprimary">
+                        {passkey.friendly_name || "Passkey"}
+                      </p>
+                      <p className="text-xs text-textmuted">
+                        {passkey.status || "unknown"} • {passkey.created_at ? new Date(passkey.created_at).toLocaleDateString() : "date unknown"}
+                      </p>
+                      <button
+                        onClick={() => handleDeletePasskey(passkey.id)}
+                        disabled={passkeyBusy}
+                        className="mt-2 text-xs text-rose-dark hover:text-rose transition disabled:opacity-50"
+                      >
+                        Remove passkey
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={handleCreatePasskey} disabled={passkeyBusy} size="sm">
+                  {passkeyBusy ? "Please wait..." : "Add passkey"}
+                </Button>
+                {passkeys.length > 0 && (
+                  <Button
+                    onClick={handleVerifyPasskey}
+                    disabled={passkeyBusy}
+                    size="sm"
+                    variant="secondary"
+                  >
+                    Verify now
+                  </Button>
+                )}
+              </div>
+
+              {passkeyMessage && (
+                <p className="text-xs text-emerald-700">{passkeyMessage}</p>
+              )}
+              {passkeyError && (
+                <p className="text-xs text-rose-700">{passkeyError}</p>
+              )}
+            </div>
+          )}
+        </Card>
 
         {/* Privacy note */}
         <p className="text-xs text-textmuted text-center">
