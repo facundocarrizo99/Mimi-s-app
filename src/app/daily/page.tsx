@@ -143,7 +143,7 @@ export default function DailyPage() {
             animate={{ opacity: 1 }}
             className="text-center mb-2"
           >
-            <h2 className="font-serif text-2xl text-textprimary mb-1">
+            <h2 className="text-2xl font-semibold tracking-tight text-textprimary mb-1">
               {formatDate(date)}
             </h2>
             <p className="text-sm text-textsecondary">

@@ -132,7 +132,13 @@ export default function SettingsPage() {
     });
 
     if (error) {
-      setPasskeyError(error.message);
+      if (error.message.toLowerCase().includes("mfa enroll is disabled for webauthn")) {
+        setPasskeyError(
+          "Passkeys are not enabled in Supabase yet. Go to Supabase Dashboard → Authentication → MFA and enable WebAuthn."
+        );
+      } else {
+        setPasskeyError(error.message);
+      }
       setPasskeyBusy(false);
       return;
     }
@@ -299,6 +305,9 @@ export default function SettingsPage() {
             <div className="space-y-3">
               <p className="text-xs text-textsecondary">
                 Add a passkey for stronger sign-in security. Keep magic link as backup.
+              </p>
+              <p className="text-xs text-textmuted">
+                Requires Supabase WebAuthn MFA to be enabled in your project settings.
               </p>
 
               {passkeys.length === 0 ? (
