@@ -12,11 +12,11 @@ interface CardProps {
 export function Card({ children, className, delay = 0 }: CardProps) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 16 }}
+      initial={{ opacity: 0, y: 14 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay, ease: "easeOut" }}
+      transition={{ duration: 0.32, delay, ease: [0.2, 0, 0, 1] }}
       className={cn(
-        "rounded-2xl bg-white/70 backdrop-blur-sm shadow-sm border border-white/50 p-6",
+        "md3-surface p-6",
         className
       )}
     >

@@ -66,7 +66,7 @@ export function QuestionCard({
       </div>
 
       {/* Question */}
-      <p className="font-serif text-lg text-textprimary leading-relaxed mb-5">
+      <p className="text-lg text-textprimary leading-relaxed mb-5 font-medium">
         {dailyQuestion.question?.text}
       </p>
 
@@ -78,7 +78,7 @@ export function QuestionCard({
             onChange={(e) => setAnswerText(e.target.value)}
             placeholder="Your words here..."
             rows={3}
-            className="w-full px-4 py-3 rounded-xl bg-white/50 border border-white/60 text-textprimary placeholder:text-textmuted focus:outline-none focus:ring-2 focus:ring-rose/30 transition resize-none text-sm"
+            className="w-full px-4 py-3 rounded-2xl bg-[var(--md-sys-color-surface)] border border-[var(--md-sys-color-outline-variant)]/70 text-textprimary placeholder:text-textmuted transition resize-none text-sm"
           />
           <div className="flex justify-end mt-3">
             <Button
@@ -93,7 +93,7 @@ export function QuestionCard({
       ) : (
         <div className="space-y-3">
           {/* My answer */}
-          <div className="rounded-xl bg-blush/30 p-4">
+          <div className="rounded-2xl bg-[var(--md-sys-color-primary-container)]/60 p-4 border border-[var(--md-sys-color-outline-variant)]/40">
             <p className="text-xs text-textmuted mb-1">You wrote</p>
             <p className="text-sm text-textprimary leading-relaxed">
               {myAnswer?.text || answerText}

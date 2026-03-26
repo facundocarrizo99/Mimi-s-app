@@ -151,9 +151,14 @@ export default function CouplesPage() {
   return (
     <div className="min-h-screen">
       {/* Header */}
-      <header className="sticky top-0 z-40 backdrop-blur-md bg-white/30 border-b border-white/30">
-        <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
-          <span className="font-serif text-xl text-textprimary">Ours</span>
+      <header className="sticky top-0 z-40 backdrop-blur-xl bg-[var(--md-sys-color-surface)]/85 border-b border-[var(--md-sys-color-outline-variant)]/45">
+        <div className="max-w-lg mx-auto px-4 py-3.5 flex items-center justify-between">
+          <span className="text-xl font-semibold tracking-tight text-textprimary inline-flex items-center gap-2">
+            <span className="inline-grid place-items-center w-8 h-8 rounded-full bg-[var(--md-sys-color-primary-container)] text-base">
+              ♡
+            </span>
+            Ours
+          </span>
         </div>
       </header>
 
@@ -163,7 +168,7 @@ export default function CouplesPage() {
           animate={{ opacity: 1 }}
           className="text-center mb-2"
         >
-          <h2 className="font-serif text-2xl text-textprimary mb-1">
+          <h2 className="text-2xl font-semibold tracking-tight text-textprimary mb-1">
             Your Spaces
           </h2>
           <p className="text-sm text-textsecondary">
@@ -186,12 +191,12 @@ export default function CouplesPage() {
                 }
                 className="w-full text-left"
               >
-                <div className="rounded-2xl bg-white/70 backdrop-blur-sm shadow-sm border border-white/50 p-6 hover:bg-white/80 hover:shadow-md transition-all duration-200">
+                <div className="md3-surface p-6 hover:brightness-[1.02] transition-all duration-200">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="text-lg">💕</span>
-                        <h3 className="font-serif text-lg text-textprimary">
+                        <h3 className="text-lg font-medium text-textprimary">
                           {couple.partner.display_name ||
                             couple.partner.email}
                         </h3>
@@ -207,9 +212,9 @@ export default function CouplesPage() {
                       {couple.today_progress.total > 0 ? (
                         <div className="mt-3">
                           <div className="flex items-center gap-2">
-                            <div className="flex-1 h-1.5 bg-white/50 rounded-full overflow-hidden">
+                            <div className="flex-1 h-1.5 bg-[var(--md-sys-color-surface-container-high)] rounded-full overflow-hidden">
                               <div
-                                className="h-full bg-rose/70 rounded-full transition-all duration-500"
+                                className="h-full bg-[var(--md-sys-color-primary)] rounded-full transition-all duration-500"
                                 style={{
                                   width: `${
                                     (couple.today_progress.answered /
@@ -237,10 +242,10 @@ export default function CouplesPage() {
                 </div>
               </button>
             ) : (
-              <div className="rounded-2xl bg-white/70 backdrop-blur-sm shadow-sm border border-white/50 p-6">
+              <div className="md3-surface p-6">
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-lg">⏳</span>
-                  <h3 className="font-serif text-lg text-textprimary">
+                  <h3 className="text-lg font-medium text-textprimary">
                     Waiting for partner...
                   </h3>
                 </div>
@@ -249,12 +254,12 @@ export default function CouplesPage() {
                     Share this invite code:
                   </p>
                   <div className="flex items-center gap-2">
-                    <div className="font-mono text-sm tracking-widest text-textprimary bg-white/50 rounded-lg px-3 py-1.5">
+                    <div className="font-mono text-sm tracking-widest text-textprimary bg-[var(--md-sys-color-surface-container-high)] rounded-lg px-3 py-1.5">
                       {couple.invite_code}
                     </div>
                     <button
                       onClick={() => copyCode(couple.invite_code)}
-                      className="text-xs px-2 py-1 rounded-lg bg-blush/50 hover:bg-blush text-textsecondary transition"
+                      className="text-xs px-2 py-1 rounded-lg bg-[var(--md-sys-color-secondary-container)] hover:brightness-105 text-textsecondary transition"
                     >
                       {copied === couple.invite_code ? "Copied!" : "Copy"}
                     </button>
@@ -270,7 +275,7 @@ export default function CouplesPage() {
           <Card>
             <div className="text-center py-4">
               <p className="text-2xl mb-3">💫</p>
-              <p className="font-serif text-lg text-textprimary mb-1">
+              <p className="text-lg font-medium text-textprimary mb-1">
                 No spaces yet
               </p>
               <p className="text-sm text-textsecondary">
@@ -294,7 +299,7 @@ export default function CouplesPage() {
                 setShowJoin(false);
                 setError("");
               }}
-              className="flex-1 p-4 rounded-xl bg-blush/30 hover:bg-blush/50 transition text-center"
+              className="flex-1 p-4 rounded-2xl bg-[var(--md-sys-color-primary-container)]/70 hover:brightness-105 transition text-center border border-[var(--md-sys-color-outline-variant)]/40"
             >
               <p className="text-sm font-medium text-textprimary">
                 New space
@@ -309,7 +314,7 @@ export default function CouplesPage() {
                 setShowCreate(false);
                 setError("");
               }}
-              className="flex-1 p-4 rounded-xl bg-lavender/30 hover:bg-lavender/50 transition text-center"
+              className="flex-1 p-4 rounded-2xl bg-[var(--md-sys-color-secondary-container)]/70 hover:brightness-105 transition text-center border border-[var(--md-sys-color-outline-variant)]/40"
             >
               <p className="text-sm font-medium text-textprimary">Join</p>
               <p className="text-xs text-textsecondary mt-0.5">
@@ -323,7 +328,7 @@ export default function CouplesPage() {
         {showCreate && (
           <Card>
             <div className="space-y-4">
-              <h3 className="font-serif text-lg text-textprimary text-center">
+              <h3 className="text-lg font-medium text-textprimary text-center">
                 Create a new space
               </h3>
 
@@ -338,13 +343,13 @@ export default function CouplesPage() {
                       value={displayName}
                       onChange={(e) => setDisplayName(e.target.value)}
                       placeholder="Your name"
-                      className="w-full px-4 py-2.5 rounded-xl bg-white/60 border border-white/50 text-textprimary placeholder:text-textmuted focus:outline-none focus:ring-2 focus:ring-rose/30 transition text-sm"
+                      className="w-full px-4 py-2.5 rounded-2xl bg-[var(--md-sys-color-surface)] border border-[var(--md-sys-color-outline-variant)]/70 text-textprimary placeholder:text-textmuted transition text-sm"
                     />
                   </div>
                   <button
                     onClick={handleCreate}
                     disabled={actionLoading}
-                    className="w-full px-4 py-2.5 rounded-xl bg-rose/80 hover:bg-rose text-white text-sm font-medium transition disabled:opacity-50"
+                    className="w-full px-4 py-2.5 rounded-full bg-[var(--md-sys-color-primary)] hover:brightness-110 text-white text-sm font-medium transition disabled:opacity-50"
                   >
                     {actionLoading ? "Creating..." : "Create space"}
                   </button>
@@ -358,7 +363,7 @@ export default function CouplesPage() {
                   <p className="text-sm text-textsecondary mb-3">
                     Share this code with your partner:
                   </p>
-                  <div className="text-2xl font-mono tracking-widest text-textprimary bg-white/50 rounded-xl p-4 mb-3">
+                   <div className="text-2xl font-mono tracking-widest text-textprimary bg-[var(--md-sys-color-surface-container-high)] rounded-2xl p-4 mb-3">
                     {createdCode}
                   </div>
                   <button
@@ -369,7 +374,7 @@ export default function CouplesPage() {
                   </button>
                   <button
                     onClick={handleContinueAfterCreate}
-                    className="text-sm text-rose-dark hover:text-rose transition"
+                     className="text-sm text-[var(--md-sys-color-primary)] hover:brightness-110 transition"
                   >
                     Done
                   </button>
@@ -399,7 +404,7 @@ export default function CouplesPage() {
         {showJoin && (
           <Card>
             <div className="space-y-4">
-              <h3 className="font-serif text-lg text-textprimary text-center">
+              <h3 className="text-lg font-medium text-textprimary text-center">
                 Join a space
               </h3>
               <div>
@@ -411,7 +416,7 @@ export default function CouplesPage() {
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
                   placeholder="Your name"
-                  className="w-full px-4 py-2.5 rounded-xl bg-white/60 border border-white/50 text-textprimary placeholder:text-textmuted focus:outline-none focus:ring-2 focus:ring-rose/30 transition text-sm"
+                  className="w-full px-4 py-2.5 rounded-2xl bg-[var(--md-sys-color-surface)] border border-[var(--md-sys-color-outline-variant)]/70 text-textprimary placeholder:text-textmuted transition text-sm"
                 />
               </div>
               <div>
@@ -423,13 +428,13 @@ export default function CouplesPage() {
                   value={inviteCode}
                   onChange={(e) => setInviteCode(e.target.value)}
                   placeholder="Enter invite code"
-                  className="w-full px-4 py-2.5 rounded-xl bg-white/60 border border-white/50 text-textprimary placeholder:text-textmuted focus:outline-none focus:ring-2 focus:ring-rose/30 transition text-sm font-mono tracking-wider text-center"
+                  className="w-full px-4 py-2.5 rounded-2xl bg-[var(--md-sys-color-surface)] border border-[var(--md-sys-color-outline-variant)]/70 text-textprimary placeholder:text-textmuted transition text-sm font-mono tracking-wider text-center"
                 />
               </div>
               <button
                 onClick={handleJoin}
                 disabled={actionLoading || !inviteCode.trim()}
-                className="w-full px-4 py-2.5 rounded-xl bg-rose/80 hover:bg-rose text-white text-sm font-medium transition disabled:opacity-50"
+                className="w-full px-4 py-2.5 rounded-full bg-[var(--md-sys-color-primary)] hover:brightness-110 text-white text-sm font-medium transition disabled:opacity-50"
               >
                 {actionLoading ? "Joining..." : "Join"}
               </button>

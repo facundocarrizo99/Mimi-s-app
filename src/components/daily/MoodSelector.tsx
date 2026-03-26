@@ -39,7 +39,7 @@ export function MoodSelector({ currentMood, onSubmit }: MoodSelectorProps) {
     <Card className="relative overflow-hidden">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full text-left"
+        className="w-full text-left rounded-xl px-1 py-0.5 md3-state-layer"
       >
         <div className="flex items-center justify-between">
           <p className="text-sm text-textsecondary">
@@ -57,7 +57,7 @@ export function MoodSelector({ currentMood, onSubmit }: MoodSelectorProps) {
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.3 }}
+            transition={{ duration: 0.24, ease: [0.2, 0, 0, 1] }}
           >
             <div className="pt-4">
               <div className="flex flex-wrap gap-2 mb-4">
@@ -65,10 +65,10 @@ export function MoodSelector({ currentMood, onSubmit }: MoodSelectorProps) {
                   <button
                     key={mood.emoji}
                     onClick={() => setSelected(mood.emoji)}
-                    className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${
+                    className={`flex flex-col items-center gap-1 p-2.5 rounded-2xl border transition-all ${
                       selected === mood.emoji
-                        ? "bg-blush-dark/30 scale-110"
-                        : "hover:bg-white/40"
+                        ? "bg-[var(--md-sys-color-primary-container)] border-[var(--md-sys-color-primary)]/30 scale-105"
+                        : "border-[var(--md-sys-color-outline-variant)]/35 hover:bg-[var(--md-sys-color-surface-container-high)]"
                     }`}
                   >
                     <span className="text-2xl">{mood.emoji}</span>
@@ -82,13 +82,13 @@ export function MoodSelector({ currentMood, onSubmit }: MoodSelectorProps) {
                 value={reflection}
                 onChange={(e) => setReflection(e.target.value)}
                 placeholder="A short reflection... (optional)"
-                className="w-full px-3 py-2 rounded-xl bg-white/50 border border-white/60 text-sm text-textprimary placeholder:text-textmuted focus:outline-none focus:ring-2 focus:ring-rose/30 transition mb-3"
+                className="w-full px-3 py-2.5 rounded-2xl bg-[var(--md-sys-color-surface)] border border-[var(--md-sys-color-outline-variant)]/70 text-sm text-textprimary placeholder:text-textmuted transition mb-3"
               />
 
               <button
                 onClick={handleSave}
                 disabled={!selected || saving}
-                className="text-sm text-rose-dark hover:text-rose disabled:text-textmuted transition"
+                className="text-sm text-[var(--md-sys-color-primary)] hover:brightness-110 disabled:text-textmuted transition"
               >
                 {saving ? "Saving..." : "Save mood"}
               </button>

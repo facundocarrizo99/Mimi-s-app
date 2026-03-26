@@ -143,7 +143,7 @@ export default function DailyPage() {
             animate={{ opacity: 1 }}
             className="text-center mb-2"
           >
-            <h2 className="font-serif text-2xl text-textprimary mb-1">
+            <h2 className="text-2xl font-semibold tracking-tight text-textprimary mb-1">
               {formatDate(date)}
             </h2>
             <p className="text-sm text-textsecondary">
@@ -162,11 +162,11 @@ export default function DailyPage() {
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="text-center py-4"
+            transition={{ duration: 0.34, ease: [0.2, 0, 0, 1] }}
+            className="text-center py-5 md3-surface"
           >
             <p className="text-3xl mb-3">&#10024;</p>
-            <p className="font-serif text-xl text-textprimary mb-1">
+            <p className="text-xl text-textprimary mb-1 font-medium">
               All done for today
             </p>
             <p className="text-sm text-textsecondary mb-6">
@@ -174,7 +174,7 @@ export default function DailyPage() {
             </p>
             <button
               onClick={() => router.push(`/answers?couple=${coupleId}`)}
-              className="inline-flex items-center gap-2 px-8 py-3 rounded-xl bg-lavender/50 hover:bg-lavender/70 text-textprimary font-medium transition-all duration-200"
+              className="inline-flex items-center gap-2 px-8 py-3 rounded-full bg-[var(--md-sys-color-secondary-container)] hover:brightness-105 text-textprimary font-medium transition-all duration-200"
             >
               <span>💌</span>
               See partner&apos;s answers
@@ -190,8 +190,8 @@ export default function DailyPage() {
                 key={q.id}
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: i * 0.06 }}
-                className="rounded-2xl bg-white/70 backdrop-blur-sm shadow-sm border border-white/50 p-6"
+                transition={{ duration: 0.35, delay: i * 0.06, ease: [0.2, 0, 0, 1] }}
+                className="md3-surface p-6"
               >
                 <div className="flex items-center justify-between mb-3">
                   <span
@@ -201,10 +201,10 @@ export default function DailyPage() {
                   </span>
                   <span className="text-textmuted text-xs">{q.position}/7</span>
                 </div>
-                <p className="font-serif text-lg text-textprimary leading-relaxed mb-4">
+                <p className="text-lg text-textprimary leading-relaxed mb-4 font-medium">
                   {q.question?.text}
                 </p>
-                <div className="rounded-xl bg-blush/30 p-4">
+                <div className="rounded-2xl bg-[var(--md-sys-color-primary-container)]/60 p-4 border border-[var(--md-sys-color-outline-variant)]/40">
                   <p className="text-xs text-textmuted mb-1">You wrote</p>
                   <p className="text-sm text-textprimary leading-relaxed">
                     {myAnswer?.text}
@@ -227,7 +227,7 @@ export default function DailyPage() {
           animate={{ opacity: 1 }}
           className="text-center mb-2"
         >
-          <h2 className="font-serif text-2xl text-textprimary mb-1">
+          <h2 className="text-2xl font-semibold tracking-tight text-textprimary mb-1">
             {formatDate(date)}
           </h2>
           <p className="text-sm text-textsecondary">

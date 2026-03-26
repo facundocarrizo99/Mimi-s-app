@@ -117,7 +117,7 @@ export default function MemoryPage() {
           animate={{ opacity: 1 }}
           className="text-center mb-2"
         >
-          <h2 className="font-serif text-2xl text-textprimary mb-1">
+          <h2 className="text-2xl font-semibold tracking-tight text-textprimary mb-1">
             Memory Book
           </h2>
           <p className="text-sm text-textsecondary">
@@ -132,7 +132,7 @@ export default function MemoryPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search your memories..."
-            className="w-full px-4 py-2.5 rounded-xl bg-white/60 border border-white/50 text-sm text-textprimary placeholder:text-textmuted focus:outline-none focus:ring-2 focus:ring-rose/30 transition"
+            className="w-full px-4 py-2.5 rounded-2xl bg-[var(--md-sys-color-surface)] border border-[var(--md-sys-color-outline-variant)]/70 text-sm text-textprimary placeholder:text-textmuted transition"
           />
         </form>
 
@@ -144,8 +144,8 @@ export default function MemoryPage() {
               onClick={() => handleFilterChange(f.value)}
               className={`px-3 py-1.5 rounded-full text-xs font-medium transition ${
                 filter === f.value
-                  ? "bg-rose/70 text-white"
-                  : "bg-white/50 text-textsecondary hover:bg-white/70"
+                  ? "bg-[var(--md-sys-color-primary)] text-white"
+                  : "bg-[var(--md-sys-color-surface-container)] text-textsecondary hover:brightness-105 border border-[var(--md-sys-color-outline-variant)]/30"
               }`}
             >
               {f.label}
@@ -155,7 +155,7 @@ export default function MemoryPage() {
 
         {/* On This Day */}
         {onThisDay.length > 0 && (
-          <Card className="border-l-4 border-l-lavender-dark">
+          <Card className="border-l-4 border-l-[var(--md-sys-color-primary)]">
             <p className="text-sm font-medium text-textprimary mb-2">
               On this day...
             </p>
@@ -164,13 +164,13 @@ export default function MemoryPage() {
                 <p className="text-xs text-textmuted mb-1">
                   {formatDate(entry.question_date)}
                 </p>
-                <p className="text-sm text-textsecondary italic font-serif">
+                <p className="text-sm text-textsecondary italic">
                   &ldquo;{entry.question?.text}&rdquo;
                 </p>
                 {entry.answers?.map((a: Answer) => (
                   <p
                     key={a.id}
-                    className="text-xs text-textmuted mt-1 pl-3 border-l-2 border-blush-dark/30"
+                    className="text-xs text-textmuted mt-1 pl-3 border-l-2 border-[var(--md-sys-color-outline-variant)]/60"
                   >
                     {a.text}
                   </p>
@@ -240,7 +240,7 @@ function MemoryCard({
   );
 
   return (
-    <div className="rounded-2xl bg-white/60 backdrop-blur-sm p-5 border border-white/40 shadow-sm">
+    <div className="md3-surface p-5">
       <div className="flex items-center justify-between mb-3">
         <span
           className={`text-xs px-2 py-0.5 rounded-full font-medium ${getCategoryColor(category)}`}
@@ -259,19 +259,19 @@ function MemoryCard({
         </button>
       </div>
 
-      <p className="font-serif text-base text-textprimary mb-4 leading-relaxed">
+      <p className="text-base font-medium text-textprimary mb-4 leading-relaxed">
         {entry.question?.text}
       </p>
 
       <div className="space-y-2">
         {myAnswer && (
-          <div className="rounded-xl bg-blush/20 p-3">
+          <div className="rounded-2xl bg-[var(--md-sys-color-primary-container)]/55 p-3 border border-[var(--md-sys-color-outline-variant)]/35">
             <p className="text-xs text-textmuted mb-0.5">You</p>
             <p className="text-sm text-textprimary">{myAnswer.text}</p>
           </div>
         )}
         {partnerAnswer && (
-          <div className="rounded-xl bg-lavender/20 p-3">
+          <div className="rounded-2xl bg-[var(--md-sys-color-secondary-container)]/60 p-3 border border-[var(--md-sys-color-outline-variant)]/35">
             <p className="text-xs text-textmuted mb-0.5">Them</p>
             <p className="text-sm text-textprimary">{partnerAnswer.text}</p>
           </div>
