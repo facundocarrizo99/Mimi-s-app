@@ -77,9 +77,8 @@ export async function GET(request: NextRequest) {
     .single();
 
   if (existingCheckin) {
-    // Load answers using service client
-    const serviceClient = await createServiceClient();
-    const { data: answers } = await serviceClient
+    // Load answers using authenticated client (RLS handles authorization)
+    const { data: answers } = await supabase
       .from("weekly_checkin_answers")
       .select("*")
       .eq("checkin_id", existingCheckin.id);
@@ -94,43 +93,33 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // Create new weekly check-in
+  // Create new weekly check-in using secure function
   const questionText = selectWeeklyQuestion(couple_id, weekStartDate);
   
-  const serviceClient = await createServiceClient();
-  const { data: newCheckin, error: insertError } = await serviceClient
-    .from("weekly_checkins")
-    .insert({
-      couple_id,
-      week_start_date: weekStartDate,
-      question_text: questionText,
-      status: 'active'
-    })
-    .select()
-    .single();
+  const { data: checkinIdResult, error: rpcError } = await supabase
+    .rpc('create_or_get_weekly_checkin', {
+      p_couple_id: couple_id,
+      p_week_start_date: weekStartDate,
+      p_question_text: questionText
+    });
 
-  if (insertError || !newCheckin) {
-    // Race condition — try fetching again
-    const { data: retryCheckin } = await supabase
-      .from("weekly_checkins")
-      .select("*")
-      .eq("couple_id", couple_id)
-      .eq("week_start_date", weekStartDate)
-      .single();
-
-    if (retryCheckin) {
-      return NextResponse.json(
-        { 
-          checkin: retryCheckin,
-          answers: [],
-          weekStartDate 
-        },
-        { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } }
-      );
-    }
-
+  if (rpcError || !checkinIdResult) {
     return NextResponse.json(
       { error: "Failed to create weekly check-in" },
+      { status: 500 }
+    );
+  }
+
+  // Fetch the created check-in
+  const { data: newCheckin } = await supabase
+    .from("weekly_checkins")
+    .select("*")
+    .eq("id", checkinIdResult)
+    .single();
+
+  if (!newCheckin) {
+    return NextResponse.json(
+      { error: "Failed to fetch check-in" },
       { status: 500 }
     );
   }
@@ -209,15 +198,14 @@ export async function POST(request: NextRequest) {
   }
 
   // Check if both partners have answered
-  const serviceClient = await createServiceClient();
-  const { data: allAnswers } = await serviceClient
+  const { data: allAnswers } = await supabase
     .from("weekly_checkin_answers")
     .select("*")
     .eq("checkin_id", checkin_id);
 
   if (allAnswers && allAnswers.length === 2) {
     // Mark check-in as completed
-    await serviceClient
+    await supabase
       .from("weekly_checkins")
       .update({ status: 'completed' })
       .eq("id", checkin_id);
@@ -231,26 +219,44 @@ export async function POST(request: NextRequest) {
 
 // Helper: Get Sunday of current week in timezone
 function getWeekStartDate(timezone: string): string {
+  // Get current date/time in the target timezone using Intl.DateTimeFormat
   const now = new Date();
-  const localTime = new Date(now.toLocaleString("en-US", { timeZone: timezone }));
   
-  // Get day of week (0 = Sunday, 6 = Saturday)
-  const dayOfWeek = localTime.getDay();
+  // Get parts in the target timezone
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    weekday: "long"
+  });
   
-  // Calculate days to subtract to get to Sunday
-  const daysToSunday = dayOfWeek;
+  const parts = formatter.formatToParts(now);
+  const year = parseInt(parts.find(p => p.type === "year")?.value || "");
+  const month = parseInt(parts.find(p => p.type === "month")?.value || "");
+  const day = parseInt(parts.find(p => p.type === "day")?.value || "");
+  const weekday = parts.find(p => p.type === "weekday")?.value || "";
   
-  const sunday = new Date(localTime);
-  sunday.setDate(sunday.getDate() - daysToSunday);
+  // Map weekday to number (0 = Sunday, 6 = Saturday)
+  const weekdayMap: { [key: string]: number } = {
+    "Sunday": 0, "Monday": 1, "Tuesday": 2, "Wednesday": 3,
+    "Thursday": 4, "Friday": 5, "Saturday": 6
+  };
+  const dayOfWeek = weekdayMap[weekday] || 0;
   
-  const formatter = new Intl.DateTimeFormat("en-CA", {
+  // Create date and subtract days to get to Sunday
+  const currentDate = new Date(year, month - 1, day);
+  currentDate.setDate(currentDate.getDate() - dayOfWeek);
+  
+  // Format as YYYY-MM-DD
+  const sundayFormatter = new Intl.DateTimeFormat("en-CA", {
     timeZone: timezone,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
   });
   
-  return formatter.format(sunday);
+  return sundayFormatter.format(currentDate);
 }
 
 // Helper: Select a weekly question based on week rotation
