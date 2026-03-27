@@ -2,42 +2,52 @@
 @import "tailwindcss";
 
 @theme {
-  --color-blush: #f6edff;
-  --color-blush-dark: #d5c2ec;
-  --color-lavender: #eaddff;
-  --color-lavender-dark: #c8b8df;
-  --color-dusk: #d0e4ff;
-  --color-dusk-dark: #acc7ea;
-  --color-rose: #a7385a;
-  --color-rose-dark: #8b2a49;
-  --color-warmwhite: #fef7ff;
-  --color-softgray: #f3edf7;
-  --color-textprimary: #1d1b20;
-  --color-textsecondary: #49454f;
-  --color-textmuted: #7a757f;
+  --color-blush: #f3e5de;
+  --color-blush-dark: #e1c8bc;
+  --color-lavender: #f1e2dd;
+  --color-lavender-dark: #d6b7ab;
+  --color-dusk: #efe5dd;
+  --color-dusk-dark: #dcc8bb;
+  --color-rose: #d49a89;
+  --color-rose-dark: #c2847a;
+  --color-warmwhite: #faf6f0;
+  --color-softgray: #f2e9df;
+  --color-textprimary: #3e3633;
+  --color-textsecondary: #645955;
+  --color-textmuted: #8a7c76;
 
   --font-serif: "Fraunces", "Times New Roman", serif;
   --font-sans: "Roboto", system-ui, -apple-system, sans-serif;
 }
 
 :root {
-  --md-sys-color-primary: #6750a4;
+  --md-sys-color-primary: #c2847a;
   --md-sys-color-on-primary: #ffffff;
-  --md-sys-color-primary-container: #eaddff;
-  --md-sys-color-on-primary-container: #21005d;
-  --md-sys-color-secondary: #625b71;
-  --md-sys-color-secondary-container: #e8def8;
-  --md-sys-color-tertiary-container: #ffd8e4;
-  --md-sys-color-surface: #fef7ff;
-  --md-sys-color-surface-container: #f3edf7;
-  --md-sys-color-surface-container-high: #ece6f0;
-  --md-sys-color-outline-variant: #cac4d0;
+  --md-sys-color-primary-container: #f3dfd6;
+  --md-sys-color-on-primary-container: #51322c;
+  --md-sys-color-secondary: #d49a89;
+  --md-sys-color-secondary-container: #f4e5df;
+  --md-sys-color-tertiary-container: #efe0d7;
+  --md-sys-color-surface: #faf6f0;
+  --md-sys-color-surface-container: #ffffff;
+  --md-sys-color-surface-container-high: #f7efe6;
+  --md-sys-color-outline-variant: #d8c9bb;
+
+  /* Softened semantic tones with warm bias. */
+  --status-success: #4f7557;
+  --status-success-container: #e8f0e6;
+  --status-warning: #8f6a39;
+  --status-warning-container: #f7eddc;
+  --status-error: #9a5653;
+  --status-error-container: #f6e6e5;
+  --status-info: #567287;
+  --status-info-container: #e6eff4;
 }
 
 body {
   background:
-    radial-gradient(1200px 600px at 20% -20%, #efe4ff 0%, transparent 65%),
-    radial-gradient(900px 500px at 120% 20%, #ffdce8 0%, transparent 70%),
+    radial-gradient(1200px 600px at 18% -20%, #f4e4d9 0%, transparent 65%),
+    radial-gradient(900px 500px at 120% 20%, #f2ddd2 0%, transparent 70%),
     var(--md-sys-color-surface);
   color: var(--color-textprimary);
   min-height: 100vh;
@@ -61,12 +71,12 @@ a:focus-visible {
 }
 
 .md3-surface {
-  background: color-mix(in srgb, var(--md-sys-color-surface-container) 88%, white);
+  background: #ffffff;
   border: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 70%, transparent);
   border-radius: 24px;
   box-shadow:
-    0 1px 2px rgba(13, 18, 30, 0.1),
-    0 8px 18px rgba(103, 80, 164, 0.08);
+    0 1px 2px rgba(139, 115, 85, 0.08),
+    0 8px 18px rgba(139, 115, 85, 0.08);
 }
 
 .md3-state-layer:hover {
@@ -78,6 +88,6 @@ a:focus-visible {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cdc2d6;
+  background: #d2bfb2;
   border-radius: 999px;
 }
