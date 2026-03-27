@@ -6,7 +6,6 @@ import { motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import { AppShell } from "@/components/layout/AppShell";
 import { Loading } from "@/components/ui/Loading";
-import { formatDate } from "@/lib/utils";
 import type { Couple } from "@/types/database";
 
 interface PastDate {
