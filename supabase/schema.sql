@@ -36,8 +36,11 @@ create policy "Users can read partner profile"
   on public.users for select
   using (
     couple_id is not null
-    and couple_id in (
-      select couple_id from public.users where id = auth.uid()
+    and exists (
+      select 1
+      from public.couples c
+      where c.id = public.users.couple_id
+        and (c.user_1_id = auth.uid() or c.user_2_id = auth.uid())
     )
   );
 

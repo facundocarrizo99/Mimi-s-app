@@ -93,33 +93,39 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // Create new weekly check-in using secure function
+  // Create new weekly check-in using service client after authorization checks.
+  // This avoids runtime failures if RPC/function permissions drift.
   const questionText = selectWeeklyQuestion(couple_id, weekStartDate);
-  
-  const { data: checkinIdResult, error: rpcError } = await supabase
-    .rpc('create_or_get_weekly_checkin', {
-      p_couple_id: couple_id,
-      p_week_start_date: weekStartDate,
-      p_question_text: questionText
-    });
+  const serviceClient = await createServiceClient();
 
-  if (rpcError || !checkinIdResult) {
-    return NextResponse.json(
-      { error: "Failed to create weekly check-in" },
-      { status: 500 }
-    );
-  }
-
-  // Fetch the created check-in
-  const { data: newCheckin } = await supabase
+  const { data: insertedCheckin, error: insertError } = await serviceClient
     .from("weekly_checkins")
+    .insert({
+      couple_id,
+      week_start_date: weekStartDate,
+      question_text: questionText,
+      status: "active",
+    })
     .select("*")
-    .eq("id", checkinIdResult)
     .single();
+
+  let newCheckin = insertedCheckin;
+
+  // If the row already exists (unique couple_id + week_start_date), fetch existing.
+  if (!newCheckin && insertError?.code === "23505") {
+    const { data: existingAfterConflict } = await serviceClient
+      .from("weekly_checkins")
+      .select("*")
+      .eq("couple_id", couple_id)
+      .eq("week_start_date", weekStartDate)
+      .single();
+
+    newCheckin = existingAfterConflict;
+  }
 
   if (!newCheckin) {
     return NextResponse.json(
-      { error: "Failed to fetch check-in" },
+      { error: "Failed to create weekly check-in" },
       { status: 500 }
     );
   }
