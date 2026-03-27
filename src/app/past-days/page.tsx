@@ -132,7 +132,7 @@ export default function PastDaysPage() {
     const month = parsedMonth.month;
 
     const firstDay = new Date(year, month - 1, 1);
-    const daysInMonth = new Date(year, month, 0).getDate;
+    const daysInMonth = new Date(year, month, 0).getDate();
     const startOffset = firstDay.getDay();
     const today = getTodayISO();
 
@@ -254,9 +254,10 @@ export default function PastDaysPage() {
               const hasData = Boolean(entry);
               const isBothComplete =
                 hasData &&
-                entry.partnerAnswerCount === entry.totalQuestions &&
-                entry.myAnswerCount === entry.totalQuestions;
-              const isMineComplete = hasData && entry.myAnswerCount === entry.totalQuestions;
+                (entry?.partnerAnswerCount ?? 0) === (entry?.totalQuestions ?? -1) &&
+                (entry?.myAnswerCount ?? 0) === (entry?.totalQuestions ?? -1);
+              const isMineComplete =
+                hasData && (entry?.myAnswerCount ?? 0) === (entry?.totalQuestions ?? -1);
 
               return (
                 <motion.button
@@ -283,7 +284,7 @@ export default function PastDaysPage() {
                     <span className="text-xs font-semibold text-textprimary">{cell.day}</span>
                     {hasData && (
                       <span className="text-[10px] text-textsecondary">
-                        {entry.myAnswerCount}/{entry.totalQuestions}
+                        {entry?.myAnswerCount ?? 0}/{entry?.totalQuestions ?? 0}
                       </span>
                     )}
                   </div>
