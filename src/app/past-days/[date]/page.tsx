@@ -169,7 +169,7 @@ export default function PastDayDetailPage() {
             {formatDate(date)}
           </h2>
           {allMyAnswered ? (
-            <p className="text-sm text-emerald-600">
+            <p className="text-sm text-[var(--status-success)]">
               All questions answered
             </p>
           ) : (
@@ -189,8 +189,8 @@ export default function PastDayDetailPage() {
             className="space-y-4"
           >
             <div className="flex items-center gap-2 px-1">
-              <span className="w-2 h-2 rounded-full bg-rose/70 animate-pulse" />
-              <p className="text-sm font-medium text-rose-700">
+              <span className="w-2 h-2 rounded-full bg-[var(--status-error)]/70 animate-pulse" />
+              <p className="text-sm font-medium text-[var(--status-error)]">
                 Unanswered
               </p>
             </div>
@@ -210,9 +210,9 @@ export default function PastDayDetailPage() {
         {/* Divider between unanswered and answered */}
         {unansweredQuestions.length > 0 && answeredQuestions.length > 0 && (
           <div className="flex items-center gap-3 py-2">
-            <div className="flex-1 h-px bg-white/50" />
+            <div className="flex-1 h-px bg-[var(--md-sys-color-outline-variant)]/55" />
             <p className="text-xs text-textmuted">Answered</p>
-            <div className="flex-1 h-px bg-white/50" />
+            <div className="flex-1 h-px bg-[var(--md-sys-color-outline-variant)]/55" />
           </div>
         )}
 

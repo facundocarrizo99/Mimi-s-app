@@ -102,8 +102,8 @@ export default function PastDaysPage() {
             transition={{ duration: 0.4 }}
             className="space-y-3"
           >
-            <h3 className="text-sm font-medium text-rose-700 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-rose/70 animate-pulse" />
+            <h3 className="text-sm font-medium text-[var(--status-error)] flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-[var(--status-error)]/70 animate-pulse" />
               Waiting for your words
             </h3>
 
@@ -122,7 +122,7 @@ export default function PastDaysPage() {
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-lg font-medium text-textprimary group-hover:text-rose-dark transition-colors">
+                    <p className="text-lg font-medium text-textprimary group-hover:text-[var(--md-sys-color-primary)] transition-colors">
                       {formatDate(d.date)}
                     </p>
                     <p className="text-xs text-textsecondary mt-1">
@@ -143,7 +143,7 @@ export default function PastDaysPage() {
                         />
                       ))}
                     </div>
-                    <span className="text-textsecondary group-hover:text-rose-dark transition-colors text-sm">
+                    <span className="text-textsecondary group-hover:text-[var(--md-sys-color-primary)] transition-colors text-sm">
                       &rarr;
                     </span>
                   </div>
@@ -162,7 +162,7 @@ export default function PastDaysPage() {
             className="space-y-3"
           >
             <h3 className="text-sm font-medium text-textsecondary flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-400" />
+              <span className="w-2 h-2 rounded-full bg-[var(--status-success)]" />
               Completed
             </h3>
 
@@ -196,7 +196,7 @@ export default function PastDaysPage() {
                       {Array.from({ length: d.totalQuestions }).map((_, qi) => (
                         <div
                           key={qi}
-                          className="w-1.5 h-1.5 rounded-full bg-emerald-400/70"
+                          className="w-1.5 h-1.5 rounded-full bg-[var(--status-success)]/70"
                         />
                       ))}
                     </div>
