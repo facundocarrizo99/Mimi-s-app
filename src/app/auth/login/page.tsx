@@ -82,7 +82,7 @@ export default function LoginPage() {
             />
 
             {error && (
-              <p className="text-rose-dark text-sm mb-3">{error}</p>
+              <p className="text-[var(--status-error)] text-sm mb-3">{error}</p>
             )}
 
             <Button

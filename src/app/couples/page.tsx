@@ -382,7 +382,7 @@ export default function CouplesPage() {
               )}
 
               {error && (
-                <p className="text-rose-dark text-sm text-center">{error}</p>
+                <p className="text-[var(--status-error)] text-sm text-center">{error}</p>
               )}
 
               {!createdCode && (
@@ -440,7 +440,7 @@ export default function CouplesPage() {
               </button>
 
               {error && (
-                <p className="text-rose-dark text-sm text-center">{error}</p>
+                <p className="text-[var(--status-error)] text-sm text-center">{error}</p>
               )}
 
               <button

@@ -34,12 +34,12 @@ export function getCategoryLabel(category: QuestionCategory): string {
 
 export function getCategoryColor(category: QuestionCategory): string {
   const colors: Record<QuestionCategory, string> = {
-    deep: "text-purple-700 bg-lavender",
-    romantic: "text-rose-700 bg-rose/20",
-    playful: "text-amber-700 bg-amber-50",
-    future: "text-sky-700 bg-dusk/50",
-    memory: "text-emerald-700 bg-emerald-50",
-    wildcard: "text-violet-700 bg-violet-50",
+    deep: "text-[var(--status-info)] bg-[var(--status-info-container)]",
+    romantic: "text-[var(--md-sys-color-primary)] bg-[var(--md-sys-color-primary-container)]",
+    playful: "text-[var(--status-warning)] bg-[var(--status-warning-container)]",
+    future: "text-[var(--md-sys-color-secondary)] bg-[var(--md-sys-color-secondary-container)]",
+    memory: "text-[var(--status-success)] bg-[var(--status-success-container)]",
+    wildcard: "text-[#7b5f58] bg-[#f3e8e2]",
   };
   return colors[category];
 }

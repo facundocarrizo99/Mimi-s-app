@@ -248,7 +248,7 @@ export default function SettingsPage() {
                 <motion.span
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  className="text-xs text-emerald-600"
+                  className="text-xs text-[var(--status-success)]"
                 >
                   Changes saved
                 </motion.span>
@@ -328,7 +328,7 @@ export default function SettingsPage() {
                       <button
                         onClick={() => handleDeletePasskey(passkey.id)}
                         disabled={passkeyBusy}
-                        className="mt-2 text-xs text-rose-dark hover:text-rose transition disabled:opacity-50"
+                        className="mt-2 text-xs text-[var(--md-sys-color-primary)] hover:brightness-110 transition disabled:opacity-50"
                       >
                         Remove passkey
                       </button>
@@ -354,10 +354,10 @@ export default function SettingsPage() {
               </div>
 
               {passkeyMessage && (
-                <p className="text-xs text-emerald-700">{passkeyMessage}</p>
+                <p className="text-xs text-[var(--status-success)]">{passkeyMessage}</p>
               )}
               {passkeyError && (
-                <p className="text-xs text-rose-700">{passkeyError}</p>
+                <p className="text-xs text-[var(--status-error)]">{passkeyError}</p>
               )}
             </div>
           )}
