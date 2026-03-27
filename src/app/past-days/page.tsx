@@ -86,8 +86,6 @@ export default function PastDaysPage() {
     loadData();
   }, [loadData]);
 
-  if (loading) return <Loading />;
-
   const pastDates = dates.filter((d) => !d.isToday);
 
   const availableMonths = useMemo(() => {
@@ -153,6 +151,8 @@ export default function PastDaysPage() {
   const bothCompletedDays = selectedMonthData.filter(
     (d) => d.partnerAnswerCount === d.totalQuestions && d.myAnswerCount === d.totalQuestions
   ).length;
+
+  if (loading) return <Loading />;
 
   return (
     <AppShell
