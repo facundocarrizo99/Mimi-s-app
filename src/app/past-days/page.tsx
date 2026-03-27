@@ -73,7 +73,7 @@ export default function PastDaysPage() {
 
     const latestPastDate = aggregatedDates.find((d) => !d.isToday);
     if (latestPastDate) {
-      setSelectedMonth(latestPastDate.date.slice(0, 7));
+      setSelectedMonth(getMonthKey(latestPastDate.date) || getCurrentMonth());
     } else {
       setSelectedMonth(getCurrentMonth());
     }
@@ -91,7 +91,10 @@ export default function PastDaysPage() {
   const availableMonths = useMemo(() => {
     const monthSet = new Set<string>();
     for (const d of pastDates) {
-      monthSet.add(d.date.slice(0, 7));
+      const monthKey = getMonthKey(d.date);
+      if (monthKey) {
+        monthSet.add(monthKey);
+      }
     }
     const months = Array.from(monthSet).sort((a, b) => b.localeCompare(a));
     return months.length > 0 ? months : [getCurrentMonth()];
@@ -102,17 +105,18 @@ export default function PastDaysPage() {
   const dateMap = useMemo(() => {
     const map = new Map<string, PastDate>();
     for (const d of pastDates) {
-      map.set(d.date, d);
+      const dayKey = getDateKey(d.date);
+      if (dayKey) {
+        map.set(dayKey, d);
+      }
     }
     return map;
   }, [pastDates]);
 
   const calendarDays = useMemo(() => {
-    const [yearStr, monthStr] = effectiveMonth.split("-");
-    const year = Number(yearStr);
-    const month = Number(monthStr);
-
-    if (!year || !month) return [] as Array<{ date: string; day: number; entry?: PastDate; isFuture: boolean }>;
+    const monthMatch = effectiveMonth.match(/^(\d{4})-(\d{2})$/);
+    const year = monthMatch ? Number(monthMatch[1]) : Number(getCurrentMonth().split("-")[0]);
+    const month = monthMatch ? Number(monthMatch[2]) : Number(getCurrentMonth().split("-")[1]);
 
     const firstDay = new Date(year, month - 1, 1);
     const daysInMonth = new Date(year, month, 0).getDate;
@@ -139,7 +143,7 @@ export default function PastDaysPage() {
     return cells;
   }, [dateMap, effectiveMonth]);
 
-  const selectedMonthData = pastDates.filter((d) => d.date.startsWith(effectiveMonth));
+  const selectedMonthData = pastDates.filter((d) => getMonthKey(d.date) === effectiveMonth);
   const selectedMonthAnswered = selectedMonthData.reduce(
     (acc, d) => acc + d.myAnswerCount,
     0
@@ -342,6 +346,36 @@ export default function PastDaysPage() {
 
 function getCurrentMonth() {
   return getTodayISO().slice(0, 7);
+}
+
+function getMonthKey(value: string) {
+  const isoMonth = value.match(/^(\d{4})-(\d{2})/);
+  if (isoMonth) {
+    return `${isoMonth[1]}-${isoMonth[2]}`;
+  }
+
+  const slashDate = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (slashDate) {
+    return `${slashDate[3]}-${String(Number(slashDate[1])).padStart(2, "0")}`;
+  }
+
+  return null;
+}
+
+function getDateKey(value: string) {
+  const isoDate = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoDate) {
+    return `${isoDate[1]}-${isoDate[2]}-${isoDate[3]}`;
+  }
+
+  const slashDate = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (slashDate) {
+    return `${slashDate[3]}-${String(Number(slashDate[1])).padStart(2, "0")}-${String(
+      Number(slashDate[2])
+    ).padStart(2, "0")}`;
+  }
+
+  return null;
 }
 
 function getTodayISO() {
