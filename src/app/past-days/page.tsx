@@ -34,54 +34,83 @@ export default function PastDaysPage() {
   const loadData = useCallback(async () => {
     setLoading(true);
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      router.push("/auth/login");
-      return;
-    }
-
-    if (!coupleId) {
-      router.push("/couples");
-      return;
-    }
-
-    // Couple info for streak
-    const { data: coupleDetail } = await supabase
-      .from("couples")
-      .select("*")
-      .eq("id", coupleId)
-      .single();
-    setCouple(coupleDetail);
-
-    // Fetch all paginated dates for a full calendar experience across months.
-    const aggregatedDates: PastDate[] = [];
-    let page = 1;
-    let hasMore = true;
-
-    while (hasMore) {
-      const res = await fetch(`/api/past-days?couple_id=${coupleId}&page=${page}`);
-      const data = await res.json();
-
-      if (Array.isArray(data.dates)) {
-        aggregatedDates.push(...data.dates);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        router.push("/auth/login");
+        return;
       }
 
-      hasMore = Boolean(data.hasMore);
-      page += 1;
-    }
+      if (!coupleId) {
+        router.push("/couples");
+        return;
+      }
 
-    setDates(aggregatedDates);
+      // Couple info for streak
+      const { data: coupleDetail } = await supabase
+        .from("couples")
+        .select("*")
+        .eq("id", coupleId)
+        .single();
+      setCouple(coupleDetail);
 
-    const latestPastDate = aggregatedDates.find((d) => !d.isToday);
-    if (latestPastDate) {
-      setSelectedMonth(getMonthKey(latestPastDate) || getCurrentMonth());
-    } else {
+      // Fetch paginated dates for calendar view.
+      const aggregatedDates: PastDate[] = [];
+      let page = 1;
+      let hasMore = true;
+      const maxPages = 24;
+
+      while (hasMore && page <= maxPages) {
+        let res: Response;
+        try {
+          res = await fetch(`/api/past-days?couple_id=${coupleId}&page=${page}`, {
+            cache: "no-store",
+          });
+        } catch (error) {
+          console.error("Failed to fetch past-days page", { page, error });
+          break;
+        }
+
+        if (!res.ok) {
+          console.error("Past-days API request failed", {
+            page,
+            status: res.status,
+            statusText: res.statusText,
+          });
+          break;
+        }
+
+        const data = (await res.json().catch(() => ({}))) as {
+          dates?: PastDate[];
+          hasMore?: boolean;
+        };
+
+        if (!Array.isArray(data.dates)) {
+          break;
+        }
+
+        aggregatedDates.push(...data.dates);
+        hasMore = Boolean(data.hasMore) && data.dates.length > 0;
+        page += 1;
+      }
+
+      setDates(aggregatedDates);
+
+      const latestPastDate = aggregatedDates.find((d) => !d.isToday);
+      if (latestPastDate) {
+        setSelectedMonth(getMonthKey(latestPastDate) || getCurrentMonth());
+      } else {
+        setSelectedMonth(getCurrentMonth());
+      }
+    } catch (error) {
+      console.error("Failed to load past-days data", error);
+      setDates([]);
       setSelectedMonth(getCurrentMonth());
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [coupleId]);
 
