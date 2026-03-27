@@ -10,6 +10,9 @@ import type { Couple } from "@/types/database";
 
 interface PastDate {
   date: string;
+  date_key?: string;
+  month_key?: string;
+  day_of_month?: number | null;
   totalQuestions: number;
   myAnswerCount: number;
   partnerAnswerCount: number;
@@ -73,7 +76,7 @@ export default function PastDaysPage() {
 
     const latestPastDate = aggregatedDates.find((d) => !d.isToday);
     if (latestPastDate) {
-      setSelectedMonth(getMonthKey(latestPastDate.date) || getCurrentMonth());
+      setSelectedMonth(getMonthKey(latestPastDate) || getCurrentMonth());
     } else {
       setSelectedMonth(getCurrentMonth());
     }
@@ -91,32 +94,42 @@ export default function PastDaysPage() {
   const availableMonths = useMemo(() => {
     const monthSet = new Set<string>();
     for (const d of pastDates) {
-      const monthKey = getMonthKey(d.date);
+      const monthKey = getMonthKey(d);
       if (monthKey) {
-        monthSet.add(monthKey);
+        monthSet.add(monthKey.trim());
       }
     }
     const months = Array.from(monthSet).sort((a, b) => b.localeCompare(a));
     return months.length > 0 ? months : [getCurrentMonth()];
   }, [pastDates]);
 
-  const effectiveMonth = selectedMonth || availableMonths[0] || getCurrentMonth();
+  const effectiveMonth = (selectedMonth || availableMonths[0] || getCurrentMonth()).trim();
 
-  const dateMap = useMemo(() => {
-    const map = new Map<string, PastDate>();
-    for (const d of pastDates) {
-      const dayKey = getDateKey(d.date);
-      if (dayKey) {
-        map.set(dayKey, d);
+  const selectedMonthData = pastDates.filter((d) => getMonthKey(d) === effectiveMonth);
+
+  const dayMap = useMemo(() => {
+    const map = new Map<number, PastDate>();
+    for (const d of selectedMonthData) {
+      if (typeof d.day_of_month === "number" && d.day_of_month >= 1 && d.day_of_month <= 31) {
+        map.set(d.day_of_month, d);
+        continue;
+      }
+
+      const dateKey = getDateKey(d);
+      if (!dateKey) continue;
+      const parts = dateKey.split("-");
+      const dayNumber = Number(parts[2]);
+      if (Number.isFinite(dayNumber) && dayNumber >= 1 && dayNumber <= 31) {
+        map.set(dayNumber, d);
       }
     }
     return map;
-  }, [pastDates]);
+  }, [selectedMonthData]);
 
   const calendarDays = useMemo(() => {
-    const monthMatch = effectiveMonth.match(/^(\d{4})-(\d{2})$/);
-    const year = monthMatch ? Number(monthMatch[1]) : Number(getCurrentMonth().split("-")[0]);
-    const month = monthMatch ? Number(monthMatch[2]) : Number(getCurrentMonth().split("-")[1]);
+    const parsedMonth = parseMonthKey(effectiveMonth);
+    const year = parsedMonth.year;
+    const month = parsedMonth.month;
 
     const firstDay = new Date(year, month - 1, 1);
     const daysInMonth = new Date(year, month, 0).getDate;
@@ -131,7 +144,7 @@ export default function PastDaysPage() {
 
     for (let day = 1; day <= daysInMonth; day += 1) {
       const date = `${effectiveMonth}-${String(day).padStart(2, "0")}`;
-      const entry = dateMap.get(date);
+      const entry = dayMap.get(day);
       cells.push({
         date,
         day,
@@ -141,9 +154,7 @@ export default function PastDaysPage() {
     }
 
     return cells;
-  }, [dateMap, effectiveMonth]);
-
-  const selectedMonthData = pastDates.filter((d) => getMonthKey(d.date) === effectiveMonth);
+  }, [dayMap, effectiveMonth]);
   const selectedMonthAnswered = selectedMonthData.reduce(
     (acc, d) => acc + d.myAnswerCount,
     0
@@ -193,7 +204,7 @@ export default function PastDaysPage() {
             </div>
             <select
               value={effectiveMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
+              onChange={(e) => setSelectedMonth(e.target.value.trim())}
               className="px-3 py-2 rounded-xl bg-[var(--md-sys-color-surface-container-high)] border border-[var(--md-sys-color-outline-variant)] text-sm text-textprimary focus:outline-none focus:ring-2 focus:ring-[var(--md-sys-color-primary)]/30"
             >
               {availableMonths.map((month) => (
@@ -348,31 +359,51 @@ function getCurrentMonth() {
   return getTodayISO().slice(0, 7);
 }
 
-function getMonthKey(value: string) {
-  const isoMonth = value.match(/^(\d{4})-(\d{2})/);
+function getMonthKey(value: PastDate) {
+  if (value.month_key) {
+    return value.month_key.trim();
+  }
+
+  const source = String(value.date).trim();
+  const isoMonth = source.match(/^(\d{4})-(\d{2})/);
   if (isoMonth) {
     return `${isoMonth[1]}-${isoMonth[2]}`;
   }
 
-  const slashDate = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  const slashDate = source.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (slashDate) {
     return `${slashDate[3]}-${String(Number(slashDate[1])).padStart(2, "0")}`;
+  }
+
+  const parsed = new Date(source);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed.toISOString().slice(0, 7);
   }
 
   return null;
 }
 
-function getDateKey(value: string) {
-  const isoDate = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
+function getDateKey(value: PastDate) {
+  if (value.date_key) {
+    return value.date_key.trim();
+  }
+
+  const source = String(value.date).trim();
+  const isoDate = source.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (isoDate) {
     return `${isoDate[1]}-${isoDate[2]}-${isoDate[3]}`;
   }
 
-  const slashDate = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  const slashDate = source.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (slashDate) {
     return `${slashDate[3]}-${String(Number(slashDate[1])).padStart(2, "0")}-${String(
       Number(slashDate[2])
     ).padStart(2, "0")}`;
+  }
+
+  const parsed = new Date(source);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed.toISOString().slice(0, 10);
   }
 
   return null;
@@ -383,10 +414,26 @@ function getTodayISO() {
 }
 
 function formatMonthName(month: string) {
-  const [year, mon] = month.split("-");
-  const date = new Date(Number(year), Number(mon) - 1, 1);
+  const parsedMonth = parseMonthKey(month);
+  const date = new Date(parsedMonth.year, parsedMonth.month - 1, 1);
   return new Intl.DateTimeFormat("en-US", {
     month: "long",
     year: "numeric",
   }).format(date);
+}
+
+function parseMonthKey(value: string) {
+  const clean = String(value).trim();
+  const iso = clean.match(/^(\d{4})-(\d{2})$/);
+  if (iso) {
+    return { year: Number(iso[1]), month: Number(iso[2]) };
+  }
+
+  const parsed = new Date(clean);
+  if (!Number.isNaN(parsed.getTime())) {
+    return { year: parsed.getFullYear(), month: parsed.getMonth() + 1 };
+  }
+
+  const fallback = getCurrentMonth().split("-");
+  return { year: Number(fallback[0]), month: Number(fallback[1]) };
 }
