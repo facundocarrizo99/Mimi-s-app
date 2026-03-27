@@ -163,7 +163,7 @@ export default function WeeklyCheckinPage() {
               exit={{ scale: 0, opacity: 0 }}
               transition={{ duration: 0.5, ease: "easeOut" }}
             >
-              <HeartPulse size={120} />
+              <HeartPulse size="lg" />
             </motion.div>
           </div>
         )}

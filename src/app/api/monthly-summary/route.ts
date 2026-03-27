@@ -90,19 +90,19 @@ export async function GET(request: NextRequest) {
     .limit(5);
 
   // Fetch all answers for favorited questions in one query
-  const favoriteQuestionIds = (favoritedQuestions || []).map(fq => fq.daily_questions.id);
+  const favoriteQuestionIds = (favoritedQuestions || []).map((fq: any) => fq.daily_questions.id);
   const { data: allFavoriteAnswers } = await supabase
     .from("answers")
     .select("*")
     .in("daily_question_id", favoriteQuestionIds);
 
-  const answersByQuestionId = (allFavoriteAnswers || []).reduce((acc: any, answer) => {
+  const answersByQuestionId = (allFavoriteAnswers || []).reduce((acc: any, answer: any) => {
     if (!acc[answer.daily_question_id]) acc[answer.daily_question_id] = [];
     acc[answer.daily_question_id].push(answer);
     return acc;
   }, {});
 
-  const favoriteMoments = (favoritedQuestions || []).map(fav => {
+  const favoriteMoments = (favoritedQuestions || []).map((fav: any) => {
     const dq = fav.daily_questions;
     return {
       question: dq.question?.text,
@@ -123,7 +123,7 @@ export async function GET(request: NextRequest) {
 
   // Count mood frequency
   const moodFrequency: { [emoji: string]: number } = {};
-  (moods || []).forEach(m => {
+  (moods || []).forEach((m: any) => {
     moodFrequency[m.emoji] = (moodFrequency[m.emoji] || 0) + 1;
   });
 
@@ -144,7 +144,7 @@ export async function GET(request: NextRequest) {
     .in("daily_question_id", questionIds);
 
   const categoryCount: { [key: string]: number } = {};
-  (allAnswersInMonth || []).forEach(a => {
+  (allAnswersInMonth || []).forEach((a: any) => {
     const category = a.daily_questions?.question?.category;
     if (category) {
       categoryCount[category] = (categoryCount[category] || 0) + 1;
@@ -171,7 +171,7 @@ export async function GET(request: NextRequest) {
 
   // Count days where both partners answered all 7 questions
   const dateUserAnswerCount: { [date: string]: { [userId: string]: number } } = {};
-  (daysWithAnswers || []).forEach(dq => {
+  (daysWithAnswers || []).forEach((dq: any) => {
     if (!dateUserAnswerCount[dq.question_date]) {
       dateUserAnswerCount[dq.question_date] = {};
     }
