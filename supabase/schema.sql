@@ -296,3 +296,69 @@ begin
   end if;
 end;
 $$ language plpgsql security definer;
+
+-- ============================================================
+-- WEEKLY CHECK-INS
+-- ============================================================
+create table public.weekly_checkins (
+  id uuid primary key default uuid_generate_v4(),
+  couple_id uuid not null references public.couples(id) on delete cascade,
+  week_start_date date not null,
+  question_text text not null,
+  status text not null default 'active' check (status in ('active', 'completed')),
+  created_at timestamptz not null default now(),
+  unique (couple_id, week_start_date)
+);
+
+alter table public.weekly_checkins enable row level security;
+
+create policy "Couple members can read their weekly check-ins"
+  on public.weekly_checkins for select
+  using (
+    couple_id in (
+      select c.id from public.couples c
+      where c.user_1_id = auth.uid() or c.user_2_id = auth.uid()
+    )
+  );
+
+-- ============================================================
+-- WEEKLY CHECK-IN ANSWERS
+-- ============================================================
+create table public.weekly_checkin_answers (
+  id uuid primary key default uuid_generate_v4(),
+  checkin_id uuid not null references public.weekly_checkins(id) on delete cascade,
+  user_id uuid not null references public.users(id) on delete cascade,
+  answer_text text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (checkin_id, user_id)
+);
+
+alter table public.weekly_checkin_answers enable row level security;
+
+create policy "Users can insert own weekly check-in answers"
+  on public.weekly_checkin_answers for insert
+  with check (auth.uid() = user_id);
+
+create policy "Users can update own weekly check-in answers"
+  on public.weekly_checkin_answers for update
+  using (auth.uid() = user_id);
+
+create policy "Couple members can read weekly check-in answers"
+  on public.weekly_checkin_answers for select
+  using (
+    checkin_id in (
+      select wc.id from public.weekly_checkins wc
+      join public.couples c on c.id = wc.couple_id
+      where c.user_1_id = auth.uid() or c.user_2_id = auth.uid()
+    )
+  );
+
+-- ============================================================
+-- INDEXES: Weekly Check-ins
+-- ============================================================
+create index idx_weekly_checkins_couple_date
+  on public.weekly_checkins(couple_id, week_start_date);
+
+create index idx_weekly_checkin_answers_checkin
+  on public.weekly_checkin_answers(checkin_id);
