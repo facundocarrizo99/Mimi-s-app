@@ -10,7 +10,7 @@ interface AppShellProps {
   coupleId?: string;
 }
 
-function NavIcon({ kind }: { kind: "spaces" | "today" | "history" | "settings" }) {
+function NavIcon({ kind }: { kind: "spaces" | "today" | "history" | "settings" | "weekly" }) {
   const common = "w-5 h-5";
   if (kind === "spaces") {
     return (
@@ -24,6 +24,16 @@ function NavIcon({ kind }: { kind: "spaces" | "today" | "history" | "settings" }
       <svg viewBox="0 0 24 24" fill="none" className={common} aria-hidden>
         <rect x="4" y="6" width="16" height="14" rx="2.5" stroke="currentColor" strokeWidth="1.8" />
         <path d="M8 3.5v4M16 3.5v4M4 10h16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  if (kind === "weekly") {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" className={common} aria-hidden>
+        <rect x="4" y="6" width="16" height="14" rx="2.5" stroke="currentColor" strokeWidth="1.8" />
+        <path d="M4 10h16M9 14h6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+        <circle cx="9" cy="17" r="0.8" fill="currentColor" />
+        <circle cx="15" cy="17" r="0.8" fill="currentColor" />
       </svg>
     );
   }
@@ -49,6 +59,7 @@ export function AppShell({ children, streakCount, coupleId }: AppShellProps) {
   const navItems = [
     { href: "/couples", matchPath: "/couples", label: "Spaces", icon: "spaces" as const },
     { href: coupleId ? `/daily?couple=${coupleId}` : "/couples", matchPath: "/daily", label: "Today", icon: "today" as const },
+    { href: coupleId ? `/weekly-checkin?couple=${coupleId}` : "/couples", matchPath: "/weekly-checkin", label: "Weekly", icon: "weekly" as const },
     { href: coupleId ? `/past-days?couple=${coupleId}` : "/couples", matchPath: "/past-days", label: "Past Days", icon: "history" as const },
     { href: "/settings", matchPath: "/settings", label: "Settings", icon: "settings" as const },
   ];
