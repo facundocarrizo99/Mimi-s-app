@@ -74,3 +74,25 @@ export interface DailyQuestionWithDetails extends DailyQuestion {
   answers: Answer[];
   favorites: Favorite[];
 }
+
+export interface WeeklyCheckin {
+  id: string;
+  couple_id: string;
+  week_start_date: string;
+  question_text: string;
+  status: 'active' | 'completed';
+  created_at: string;
+}
+
+export interface WeeklyCheckinAnswer {
+  id: string;
+  checkin_id: string;
+  user_id: string;
+  answer_text: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WeeklyCheckinWithDetails extends WeeklyCheckin {
+  answers: WeeklyCheckinAnswer[];
+}
