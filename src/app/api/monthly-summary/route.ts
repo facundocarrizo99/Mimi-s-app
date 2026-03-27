@@ -89,22 +89,28 @@ export async function GET(request: NextRequest) {
     .in("daily_question_id", questionIds)
     .limit(5);
 
-  const favoriteMoments = await Promise.all(
-    (favoritedQuestions || []).map(async (fav) => {
-      const dq = fav.daily_questions;
-      const { data: answers } = await supabase
-        .from("answers")
-        .select("*")
-        .eq("daily_question_id", dq.id);
+  // Fetch all answers for favorited questions in one query
+  const favoriteQuestionIds = (favoritedQuestions || []).map(fq => fq.daily_questions.id);
+  const { data: allFavoriteAnswers } = await supabase
+    .from("answers")
+    .select("*")
+    .in("daily_question_id", favoriteQuestionIds);
 
-      return {
-        question: dq.question?.text,
-        category: dq.question?.category,
-        date: dq.question_date,
-        answers: answers || []
-      };
-    })
-  );
+  const answersByQuestionId = (allFavoriteAnswers || []).reduce((acc: any, answer) => {
+    if (!acc[answer.daily_question_id]) acc[answer.daily_question_id] = [];
+    acc[answer.daily_question_id].push(answer);
+    return acc;
+  }, {});
+
+  const favoriteMoments = (favoritedQuestions || []).map(fav => {
+    const dq = fav.daily_questions;
+    return {
+      question: dq.question?.text,
+      category: dq.question?.category,
+      date: dq.question_date,
+      answers: answersByQuestionId[dq.id] || []
+    };
+  });
 
   // 3. Mood trends
   const { data: moods } = await supabase
@@ -152,7 +158,7 @@ export async function GET(request: NextRequest) {
   // 5. Streak info during the month
   const streakAtMonthEnd = couple.streak_count || 0;
 
-  // 6. Days both answered
+  // 6. Days both answered all 7 questions
   const { data: daysWithAnswers } = await supabase
     .from("daily_questions")
     .select(`
@@ -164,19 +170,21 @@ export async function GET(request: NextRequest) {
     .lte("question_date", endDate);
 
   // Count days where both partners answered all 7 questions
-  const dateMap: { [date: string]: Set<string> } = {};
+  const dateUserAnswerCount: { [date: string]: { [userId: string]: number } } = {};
   (daysWithAnswers || []).forEach(dq => {
-    if (!dateMap[dq.question_date]) {
-      dateMap[dq.question_date] = new Set();
+    if (!dateUserAnswerCount[dq.question_date]) {
+      dateUserAnswerCount[dq.question_date] = {};
     }
     dq.answers.forEach((a: { user_id: string }) => {
-      dateMap[dq.question_date].add(a.user_id);
+      dateUserAnswerCount[dq.question_date][a.user_id] = 
+        (dateUserAnswerCount[dq.question_date][a.user_id] || 0) + 1;
     });
   });
 
-  const daysCompleted = Object.values(dateMap).filter(
-    userSet => userSet.size === 2
-  ).length;
+  const daysCompleted = Object.values(dateUserAnswerCount).filter(userCounts => {
+    const users = Object.values(userCounts);
+    return users.length === 2 && users.every(count => count === 7);
+  }).length;
 
   // 7. Weekly check-ins completed
   const { count: weeklyCheckinsCompleted } = await supabase

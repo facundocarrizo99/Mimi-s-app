@@ -82,6 +82,13 @@ export default function MonthlySummaryPage() {
 
     // Load summary data
     const res = await fetch(`/api/monthly-summary?couple_id=${coupleId}&month=${month}`);
+    
+    if (!res.ok) {
+      console.error("Failed to load summary:", res.status);
+      setLoading(false);
+      return;
+    }
+
     const data = await res.json();
 
     if (!data.error) {
@@ -214,24 +221,29 @@ export default function MonthlySummaryPage() {
                   Mood Trends
                 </h3>
                 <div className="space-y-3">
-                  {moodTrends.topMoods.map(({ emoji, count }, idx) => (
-                    <div key={emoji} className="flex items-center gap-3">
-                      <span className="text-2xl">{emoji}</span>
-                      <div className="flex-1">
-                        <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                          <motion.div
-                            initial={{ width: 0 }}
-                            animate={{ width: `${(count / moodTrends.dailyMoods.length) * 100}%` }}
-                            transition={{ duration: 0.8, delay: 0.3 + idx * 0.1 }}
-                            className="h-full bg-[var(--md-sys-color-primary)]"
-                          />
+                  {moodTrends.topMoods.map(({ emoji, count }, idx) => {
+                    const totalMoods = moodTrends.dailyMoods.length || 1;
+                    const percentage = (count / totalMoods) * 100;
+                    
+                    return (
+                      <div key={emoji} className="flex items-center gap-3">
+                        <span className="text-2xl">{emoji}</span>
+                        <div className="flex-1">
+                          <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                            <motion.div
+                              initial={{ width: 0 }}
+                              animate={{ width: `${percentage}%` }}
+                              transition={{ duration: 0.8, delay: 0.3 + idx * 0.1 }}
+                              className="h-full bg-[var(--md-sys-color-primary)]"
+                            />
+                          </div>
                         </div>
+                        <span className="text-sm text-textsecondary font-medium">
+                          {count}
+                        </span>
                       </div>
-                      <span className="text-sm text-textsecondary font-medium">
-                        {count}
-                      </span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </Card>
