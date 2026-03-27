@@ -309,24 +309,35 @@ export default function PastDaysPage() {
                       : "bg-[var(--md-sys-color-primary-container)] border-[var(--md-sys-color-primary)]/30 hover:brightness-105"
                   }`}
                 >
-                  <div className="flex items-start justify-between">
-                    <span className="text-xs font-semibold text-textprimary">{cell.day}</span>
-                    {hasData && (
-                      <span className="text-[10px] text-textsecondary">
-                        {entry?.myAnswerCount ?? 0}/{entry?.totalQuestions ?? 0}
+                  <div className="flex h-full flex-col">
+                    <div className="flex items-start justify-between">
+                      <span className="text-[11px] font-semibold leading-none text-textprimary">
+                        {cell.day}
                       </span>
-                    )}
-                  </div>
-                  <div className="mt-2">
-                    {!hasData ? (
-                      <p className="text-[10px] text-textmuted">No set</p>
-                    ) : isBothComplete ? (
-                      <p className="text-[10px] font-medium text-[var(--status-success)]">Both answered</p>
-                    ) : isMineComplete ? (
-                      <p className="text-[10px] font-medium text-[var(--md-sys-color-secondary)]">You finished</p>
-                    ) : (
-                      <p className="text-[10px] font-medium text-[var(--md-sys-color-primary)]">Pending</p>
-                    )}
+                    </div>
+
+                    <div className="flex-1 grid place-items-center">
+                      <span className="text-[13px] font-medium leading-none text-textsecondary">
+                        {hasData
+                          ? `${entry?.myAnswerCount ?? 0}/${entry?.totalQuestions ?? 0}`
+                          : "--/--"}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-center">
+                      <span
+                        className={`w-2.5 h-2.5 rounded-full ${
+                          !hasData
+                            ? "bg-[var(--md-sys-color-outline-variant)]/60"
+                            : isBothComplete
+                            ? "bg-[var(--status-success)]"
+                            : isMineComplete
+                            ? "bg-[var(--md-sys-color-secondary)]"
+                            : "bg-[var(--md-sys-color-primary)]"
+                        }`}
+                        aria-hidden
+                      />
+                    </div>
                   </div>
                 </motion.button>
               );
@@ -335,8 +346,8 @@ export default function PastDaysPage() {
 
           <div className="flex items-center gap-4 mt-4 text-[11px] text-textsecondary">
             <span className="inline-flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-[var(--md-sys-color-tertiary)]" />
-              Both answered
+              <span className="w-2.5 h-2.5 rounded-full bg-[var(--status-success)]" />
+              Both finished
             </span>
             <span className="inline-flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full bg-[var(--md-sys-color-secondary)]" />
