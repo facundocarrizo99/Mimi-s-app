@@ -60,10 +60,7 @@ export default function SettingsPage() {
     inFlightRef.current = true;
     const supabase = createClient();
     try {
-      const [coupleResponse, factorResponse] = await Promise.all([
-        fetch("/api/couple", { cache: "no-store" }),
-        supabase.auth.mfa.listFactors(),
-      ]);
+      const coupleResponse = await fetch("/api/couple", { cache: "no-store" });
 
       if (coupleResponse.status === 401) {
         window.location.href = "/auth/login";
@@ -87,12 +84,28 @@ export default function SettingsPage() {
       setTimezone(data.user?.timezone || "America/New_York");
 
       if (typeof window !== "undefined") {
-        setPasskeySupported(
-          Boolean(window.PublicKeyCredential && navigator.credentials)
+        const supported = Boolean(
+          window.PublicKeyCredential && navigator.credentials
         );
-      }
+        setPasskeySupported(supported);
 
-      setPasskeys((factorResponse.data?.all || []).filter((f) => f.factor_type === "webauthn"));
+        if (supported) {
+          void supabase.auth.mfa
+            .listFactors()
+            .then(({ data: factorData }) => {
+              setPasskeys(
+                (factorData?.all || []).filter(
+                  (f) => f.factor_type === "webauthn"
+                )
+              );
+            })
+            .catch(() => {
+              // Ignore passkey load errors during bootstrap to avoid blocking settings.
+            });
+        } else {
+          setPasskeys([]);
+        }
+      }
     } finally {
       setLoading(false);
       inFlightRef.current = false;
