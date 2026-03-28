@@ -41,42 +41,60 @@ export default function WeeklyCheckinPage() {
     
     if (!user) {
       router.push("/auth/login");
+      setLoading(false);
       return;
     }
 
     if (!coupleId) {
       router.push("/couples");
+      setLoading(false);
       return;
     }
 
     setUserId(user.id);
 
-    // Load couple info
-    const { data: coupleDetail } = await supabase
-      .from("couples")
-      .select("*")
-      .eq("id", coupleId)
-      .single();
-    
-    setCouple(coupleDetail);
+    try {
+      const [coupleResult, checkinResponse] = await Promise.all([
+        supabase
+          .from("couples")
+          .select("*")
+          .eq("id", coupleId)
+          .single(),
+        fetch(`/api/weekly-checkin?couple_id=${coupleId}`),
+      ]);
 
-    // Load weekly check-in from API
-    const res = await fetch(`/api/weekly-checkin?couple_id=${coupleId}`);
-    const data = await res.json();
-
-    if (data.checkin) {
-      setCheckin(data.checkin);
-      setAnswers(data.answers || []);
-      setWeekStartDate(data.weekStartDate);
-      
-      // Pre-fill existing answer
-      const myAnswer = data.answers?.find((a: WeeklyCheckinAnswer) => a.user_id === user.id);
-      if (myAnswer) {
-        setMyAnswerText(myAnswer.answer_text);
+      if (!checkinResponse.ok) {
+        console.error("Failed to load weekly check-in", {
+          status: checkinResponse.status,
+          statusText: checkinResponse.statusText,
+        });
+        return;
       }
-    }
 
-    setLoading(false);
+      const data = await checkinResponse.json();
+      if (!data || data.error) {
+        console.error("Weekly check-in API returned an invalid payload", data);
+        return;
+      }
+
+      setCouple(coupleResult.data ?? null);
+
+      if (data.checkin) {
+        setCheckin(data.checkin);
+        setAnswers(data.answers || []);
+        setWeekStartDate(data.weekStartDate);
+
+        // Pre-fill existing answer
+        const myAnswer = data.answers?.find((a: WeeklyCheckinAnswer) => a.user_id === user.id);
+        if (myAnswer) {
+          setMyAnswerText(myAnswer.answer_text);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load weekly-checkin page data", error);
+    } finally {
+      setLoading(false);
+    }
   }, [coupleId, router]);
 
   useEffect(() => {
