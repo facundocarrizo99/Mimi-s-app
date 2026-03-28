@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
   // Verify user belongs to this couple
   const { data: coupleCheck } = await supabase
     .from("couples")
-    .select("id, timezone")
+    .select("id, timezone, streak_count")
     .eq("id", couple_id)
     .or(`user_1_id.eq.${user.id},user_2_id.eq.${user.id}`)
     .single();
@@ -50,6 +50,14 @@ export async function GET(request: NextRequest) {
 
   // Get today's date in the couple's timezone
   const today = getDateInTimezone(timezone);
+
+  const { data: moodRow } = await supabase
+    .from("moods")
+    .select("emoji, reflection")
+    .eq("couple_id", couple_id)
+    .eq("mood_date", today)
+    .eq("user_id", user.id)
+    .maybeSingle();
 
   // Check if daily questions already exist for today
   const { data: existing } = await supabase
@@ -65,7 +73,7 @@ export async function GET(request: NextRequest) {
     const serviceClient = await createServiceClient();
     const questionIds = existing.map((dq) => dq.id);
     
-    const { data: answers, error: answersError } = await serviceClient
+    const { data: answers } = await serviceClient
       .from("answers")
       .select("*")
       .in("daily_question_id", questionIds);
@@ -85,7 +93,13 @@ export async function GET(request: NextRequest) {
     console.log("[daily-questions] answers attached:", withDetails.reduce((sum, q) => sum + q.answers.length, 0));
 
     return NextResponse.json(
-      { questions: withDetails, date: today },
+      {
+        questions: withDetails,
+        date: today,
+        couple: coupleCheck,
+        currentUserId: user.id,
+        currentMood: moodRow ? { emoji: moodRow.emoji, reflection: moodRow.reflection } : null,
+      },
       { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } }
     );
   }
@@ -172,8 +186,20 @@ export async function GET(request: NextRequest) {
       .order("position");
 
     if (retryExisting && retryExisting.length > 0) {
+      const retryWithDetails = retryExisting.map((dq) => ({
+        ...dq,
+        answers: [],
+        favorites: [],
+      }));
+
       return NextResponse.json(
-        { questions: retryExisting, date: today },
+        {
+          questions: retryWithDetails,
+          date: today,
+          couple: coupleCheck,
+          currentUserId: user.id,
+          currentMood: moodRow ? { emoji: moodRow.emoji, reflection: moodRow.reflection } : null,
+        },
         { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } }
       );
     }
@@ -199,7 +225,13 @@ export async function GET(request: NextRequest) {
   }));
 
   return NextResponse.json(
-    { questions: withDetails, date: today },
+    {
+      questions: withDetails,
+      date: today,
+      couple: coupleCheck,
+      currentUserId: user.id,
+      currentMood: moodRow ? { emoji: moodRow.emoji, reflection: moodRow.reflection } : null,
+    },
     { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } }
   );
 }

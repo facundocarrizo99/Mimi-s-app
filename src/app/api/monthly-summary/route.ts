@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
   // Verify user belongs to this couple
   const { data: couple } = await supabase
     .from("couples")
-    .select("*")
+    .select("id, streak_count")
     .eq("id", couple_id)
     .or(`user_1_id.eq.${user.id},user_2_id.eq.${user.id}`)
     .single();
@@ -201,6 +201,7 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     month: monthParam,
+    couple,
     stats: {
       totalAnswers,
       totalPossibleAnswers,

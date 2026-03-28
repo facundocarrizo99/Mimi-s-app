@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
   // Verify user belongs to this couple
   const { data: couple } = await supabase
     .from("couples")
-    .select("id, timezone")
+    .select("id, timezone, streak_count")
     .eq("id", couple_id)
     .or(`user_1_id.eq.${user.id},user_2_id.eq.${user.id}`)
     .single();
@@ -91,7 +91,9 @@ export async function GET(request: NextRequest) {
       { 
         checkin: existingCheckin,
         answers: answers || [],
-        weekStartDate 
+        weekStartDate,
+        currentUserId: user.id,
+        couple,
       },
       { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } }
     );
@@ -170,7 +172,9 @@ export async function GET(request: NextRequest) {
     { 
       checkin: newCheckin,
       answers: [],
-      weekStartDate 
+      weekStartDate,
+      currentUserId: user.id,
+      couple,
     },
     { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } }
   );
