@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { createClient } from "@/lib/supabase/client";
 import { AppShell } from "@/components/layout/AppShell";
 import { Loading } from "@/components/ui/Loading";
 import type { Couple } from "@/types/database";
@@ -29,38 +28,96 @@ export default function PastDaysPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const coupleId = searchParams.get("couple");
-  const supabase = createClient();
+  const inFlightKeyRef = useRef<string | null>(null);
 
   const loadData = useCallback(async () => {
+    if (!coupleId) {
+      router.push("/couples");
+      setLoading(false);
+      return;
+    }
+
+    if (inFlightKeyRef.current === coupleId) {
+      return;
+    }
+
+    inFlightKeyRef.current = coupleId;
     setLoading(true);
 
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
-        router.push("/auth/login");
-        return;
-      }
-
-      if (!coupleId) {
-        router.push("/couples");
-        return;
-      }
-
-      // Couple info for streak
-      const { data: coupleDetail } = await supabase
-        .from("couples")
-        .select("*")
-        .eq("id", coupleId)
-        .single();
-      setCouple(coupleDetail);
-
-      // Fetch paginated dates for calendar view.
+      // Fetch first page for fast initial render, then stream remaining pages.
       const aggregatedDates: PastDate[] = [];
       let page = 1;
-      let hasMore = true;
       const maxPages = 24;
+
+      let firstResponse: Response;
+      try {
+        firstResponse = await fetch(`/api/past-days?couple_id=${coupleId}&page=${page}`, {
+          cache: "no-store",
+        });
+      } catch (error) {
+        console.error("Failed to fetch past-days page", { page, error });
+        setCouple(null);
+        setDates([]);
+        setSelectedMonth(getCurrentMonth());
+        setLoading(false);
+        return;
+      }
+
+      if (firstResponse.status === 401) {
+        router.push("/auth/login");
+        setLoading(false);
+        return;
+      }
+
+      if (firstResponse.status === 403 || firstResponse.status === 404) {
+        router.push("/couples");
+        setLoading(false);
+        return;
+      }
+
+      if (!firstResponse.ok) {
+        console.error("Past-days API request failed", {
+          page,
+          status: firstResponse.status,
+          statusText: firstResponse.statusText,
+        });
+        setCouple(null);
+        setDates([]);
+        setSelectedMonth(getCurrentMonth());
+        setLoading(false);
+        return;
+      }
+
+      const firstPageData = (await firstResponse.json().catch(() => ({}))) as {
+        dates?: PastDate[];
+        hasMore?: boolean;
+        couple?: Couple | null;
+      };
+
+      if (!Array.isArray(firstPageData.dates)) {
+        setCouple(null);
+        setDates([]);
+        setSelectedMonth(getCurrentMonth());
+        setLoading(false);
+        return;
+      }
+
+      setCouple(firstPageData.couple ?? null);
+      aggregatedDates.push(...firstPageData.dates);
+      setDates([...aggregatedDates]);
+
+      const latestPastDate = aggregatedDates.find((d) => !d.isToday);
+      if (latestPastDate) {
+        setSelectedMonth(getMonthKey(latestPastDate) || getCurrentMonth());
+      } else {
+        setSelectedMonth(getCurrentMonth());
+      }
+
+      setLoading(false);
+
+      let hasMore = Boolean(firstPageData.hasMore) && firstPageData.dates.length > 0;
+      page += 1;
 
       while (hasMore && page <= maxPages) {
         let res: Response;
@@ -87,32 +144,28 @@ export default function PastDaysPage() {
           hasMore?: boolean;
         };
 
-        if (!Array.isArray(data.dates)) {
+        if (!Array.isArray(data.dates) || data.dates.length === 0) {
           break;
         }
 
         aggregatedDates.push(...data.dates);
-        hasMore = Boolean(data.hasMore) && data.dates.length > 0;
+        setDates([...aggregatedDates]);
+        hasMore = Boolean(data.hasMore);
         page += 1;
-      }
-
-      setDates(aggregatedDates);
-
-      const latestPastDate = aggregatedDates.find((d) => !d.isToday);
-      if (latestPastDate) {
-        setSelectedMonth(getMonthKey(latestPastDate) || getCurrentMonth());
-      } else {
-        setSelectedMonth(getCurrentMonth());
       }
     } catch (error) {
       console.error("Failed to load past-days data", error);
+      setCouple(null);
       setDates([]);
       setSelectedMonth(getCurrentMonth());
     } finally {
+      if (inFlightKeyRef.current === coupleId) {
+        inFlightKeyRef.current = null;
+      }
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [coupleId]);
+  }, [coupleId, router]);
 
   useEffect(() => {
     loadData();

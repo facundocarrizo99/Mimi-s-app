@@ -18,11 +18,15 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const coupleIdParam = searchParams.get("couple_id");
 
-  const { data: profile } = await supabase
-    .from("users")
-    .select("couple_id, timezone")
-    .eq("id", user.id)
-    .single();
+  let profile: { couple_id: string | null; timezone: string | null } | null = null;
+  if (!coupleIdParam) {
+    const { data } = await supabase
+      .from("users")
+      .select("couple_id, timezone")
+      .eq("id", user.id)
+      .single();
+    profile = data;
+  }
 
   const couple_id = coupleIdParam || profile?.couple_id;
 
@@ -33,7 +37,7 @@ export async function GET(request: NextRequest) {
   // Verify user belongs to this couple
   const { data: coupleCheck } = await supabase
     .from("couples")
-    .select("id, timezone")
+    .select("id, timezone, streak_count, user_1_id, user_2_id")
     .eq("id", couple_id)
     .or(`user_1_id.eq.${user.id},user_2_id.eq.${user.id}`)
     .single();
@@ -47,48 +51,82 @@ export async function GET(request: NextRequest) {
   // Get today's date in the couple's timezone
   const today = getDateInTimezone(timezone);
 
+  const serviceClient = await createServiceClient();
+
+  const partnerId =
+    coupleCheck.user_1_id === user.id
+      ? coupleCheck.user_2_id
+      : coupleCheck.user_1_id;
+  const partnerProfilePromise = partnerId
+    ? serviceClient
+        .from("users")
+        .select("display_name, email")
+        .eq("id", partnerId)
+        .maybeSingle()
+    : Promise.resolve({ data: null });
+
+  const [partnerProfileResult, moodResult, existingResult] = await Promise.all([
+    partnerProfilePromise,
+    serviceClient
+      .from("moods")
+      .select("emoji, reflection")
+      .eq("couple_id", couple_id)
+      .eq("mood_date", today)
+      .eq("user_id", user.id)
+      .maybeSingle(),
+    serviceClient
+      .from("daily_questions")
+      .select(
+        "id, couple_id, question_id, question_date, position, question:questions(id, text, category), answers(id, user_id, text, daily_question_id, created_at)"
+      )
+      .eq("couple_id", couple_id)
+      .eq("question_date", today)
+      .order("position"),
+  ]);
+
+  const partnerName =
+    partnerProfileResult.data?.display_name ||
+    partnerProfileResult.data?.email ||
+    "";
+
+  const moodRow = moodResult.data;
+
   // Check if daily questions already exist for today
-  const { data: existing } = await supabase
-    .from("daily_questions")
-    .select("*, question:questions(*)")
-    .eq("couple_id", couple_id)
-    .eq("question_date", today)
-    .order("position");
+  const existing = existingResult.data;
 
   if (existing && existing.length === 7) {
-    // Load answers for these questions
-    // Use service client to bypass RLS — we already verified couple membership above
-    const serviceClient = await createServiceClient();
+    // Load favorites for these questions using service client.
+    // Answers are already included in the query above.
     const questionIds = existing.map((dq) => dq.id);
-    
-    const { data: answers, error: answersError } = await serviceClient
-      .from("answers")
-      .select("*")
-      .in("daily_question_id", questionIds);
 
     const { data: favorites } = await serviceClient
       .from("favorites")
-      .select("*")
+      .select("id, user_id, daily_question_id, created_at")
       .in("daily_question_id", questionIds)
       .eq("user_id", user.id);
 
     const withDetails = existing.map((dq) => ({
       ...dq,
-      answers: (answers || []).filter((a) => a.daily_question_id === dq.id),
+      answers: dq.answers || [],
       favorites: (favorites || []).filter((f) => f.daily_question_id === dq.id),
     }));
 
-    console.log("[daily-questions] answers attached:", withDetails.reduce((sum, q) => sum + q.answers.length, 0));
-
     return NextResponse.json(
-      { questions: withDetails, date: today },
+      {
+        questions: withDetails,
+        date: today,
+        couple: coupleCheck,
+        currentUserId: user.id,
+        partnerName,
+        currentMood: moodRow ? { emoji: moodRow.emoji, reflection: moodRow.reflection } : null,
+      },
       { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } }
     );
   }
 
   // Generate new daily questions
   // Get already-used question IDs for this couple (last 60 days to avoid repeats)
-  const { data: recentQuestions } = await supabase
+  const { data: recentQuestions } = await serviceClient
     .from("daily_questions")
     .select("question_id")
     .eq("couple_id", couple_id)
@@ -96,80 +134,84 @@ export async function GET(request: NextRequest) {
 
   const usedIds = new Set((recentQuestions || []).map((q) => q.question_id));
 
+  const uniqueCategories = Array.from(new Set(DAILY_STRUCTURE));
+  const { data: allCategoryQuestions } = await serviceClient
+    .from("questions")
+    .select("id, category")
+    .in("category", uniqueCategories);
+
+  const questionsByCategory = new Map<string, { id: string }[]>();
+  for (const category of uniqueCategories) {
+    questionsByCategory.set(category, []);
+  }
+  for (const question of allCategoryQuestions || []) {
+    const bucket = questionsByCategory.get(question.category as string) || [];
+    bucket.push({ id: question.id });
+    questionsByCategory.set(question.category as string, bucket);
+  }
+
   const newDailyQuestions = [];
 
   for (let i = 0; i < DAILY_STRUCTURE.length; i++) {
     const category = DAILY_STRUCTURE[i];
 
-    // Get a random unused question from this category
-    let query = supabase
-      .from("questions")
-      .select("id")
-      .eq("category", category);
+    const available = questionsByCategory.get(category) || [];
+    if (available.length === 0) continue;
 
-    if (usedIds.size > 0) {
-      // Filter out used questions by fetching all and filtering client-side
-      const { data: available } = await query;
-      const filtered = (available || []).filter((q) => !usedIds.has(q.id));
+    const unused = available.filter((q) => !usedIds.has(q.id));
+    const pickPool = unused.length > 0 ? unused : available;
+    const pick = pickPool[Math.floor(Math.random() * pickPool.length)];
 
-      if (filtered.length === 0) {
-        // All questions used — reset and pick any
-        const { data: any } = await supabase
-          .from("questions")
-          .select("id")
-          .eq("category", category);
-        if (!any || any.length === 0) continue;
-        const pick = any[Math.floor(Math.random() * any.length)];
-        newDailyQuestions.push({
-          couple_id,
-          question_id: pick.id,
-          question_date: today,
-          position: i + 1,
-        });
-        usedIds.add(pick.id);
-      } else {
-        const pick = filtered[Math.floor(Math.random() * filtered.length)];
-        newDailyQuestions.push({
-          couple_id,
-          question_id: pick.id,
-          question_date: today,
-          position: i + 1,
-        });
-        usedIds.add(pick.id);
-      }
-    } else {
-      const { data: available } = await query;
-      if (!available || available.length === 0) continue;
-      const pick =
-        available[Math.floor(Math.random() * available.length)];
-      newDailyQuestions.push({
-        couple_id,
-        question_id: pick.id,
-        question_date: today,
-        position: i + 1,
-      });
-      usedIds.add(pick.id);
-    }
+    newDailyQuestions.push({
+      couple_id,
+      question_id: pick.id,
+      question_date: today,
+      position: i + 1,
+    });
+    usedIds.add(pick.id);
   }
 
   // Insert daily questions (use service client — no INSERT RLS policy on daily_questions)
-  const serviceClient = await createServiceClient();
   const { error: insertError } = await serviceClient
     .from("daily_questions")
     .insert(newDailyQuestions);
 
   if (insertError) {
+    const isRaceCondition =
+      insertError.code === "23505" ||
+      insertError.message.toLowerCase().includes("duplicate");
+
+    if (!isRaceCondition) {
+      return NextResponse.json(
+        { error: `Failed to generate questions: ${insertError.message}` },
+        { status: 500 }
+      );
+    }
+
     // Might be a race condition — try fetching again
-    const { data: retryExisting } = await supabase
+    const { data: retryExisting } = await serviceClient
       .from("daily_questions")
-      .select("*, question:questions(*)")
+      .select("id, couple_id, question_id, question_date, position, question:questions(id, text, category)")
       .eq("couple_id", couple_id)
       .eq("question_date", today)
       .order("position");
 
     if (retryExisting && retryExisting.length > 0) {
+      const retryWithDetails = retryExisting.map((dq) => ({
+        ...dq,
+        answers: [],
+        favorites: [],
+      }));
+
       return NextResponse.json(
-        { questions: retryExisting, date: today },
+        {
+          questions: retryWithDetails,
+          date: today,
+          couple: coupleCheck,
+          currentUserId: user.id,
+          partnerName,
+          currentMood: moodRow ? { emoji: moodRow.emoji, reflection: moodRow.reflection } : null,
+        },
         { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } }
       );
     }
@@ -181,9 +223,9 @@ export async function GET(request: NextRequest) {
   }
 
   // Fetch the newly created questions with full details
-  const { data: created } = await supabase
+  const { data: created } = await serviceClient
     .from("daily_questions")
-    .select("*, question:questions(*)")
+    .select("id, couple_id, question_id, question_date, position, question:questions(id, text, category)")
     .eq("couple_id", couple_id)
     .eq("question_date", today)
     .order("position");
@@ -195,7 +237,14 @@ export async function GET(request: NextRequest) {
   }));
 
   return NextResponse.json(
-    { questions: withDetails, date: today },
+    {
+      questions: withDetails,
+      date: today,
+      couple: coupleCheck,
+      currentUserId: user.id,
+      partnerName,
+      currentMood: moodRow ? { emoji: moodRow.emoji, reflection: moodRow.reflection } : null,
+    },
     { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } }
   );
 }

@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { createClient } from "@/lib/supabase/client";
 import { AppShell } from "@/components/layout/AppShell";
 import { Card } from "@/components/ui/Card";
 import { Loading } from "@/components/ui/Loading";
@@ -22,6 +22,7 @@ interface MemoryEntry {
 type FilterType = "all" | "favorites" | QuestionCategory;
 
 export default function MemoryPage() {
+  const router = useRouter();
   const [entries, setEntries] = useState<Record<string, MemoryEntry[]>>({});
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FilterType>("all");
@@ -30,43 +31,37 @@ export default function MemoryPage() {
   const [currentUserId, setCurrentUserId] = useState("");
   const [onThisDay, setOnThisDay] = useState<MemoryEntry[]>([]);
 
-  const supabase = createClient();
-
   const loadMemories = useCallback(
     async (filterVal: FilterType = "all", searchVal: string = "") => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-      setCurrentUserId(user.id);
-
-      const { data: profile } = await supabase
-        .from("users")
-        .select("couple_id")
-        .eq("id", user.id)
-        .single();
-
-      if (profile?.couple_id) {
-        const { data: coupleData } = await supabase
-          .from("couples")
-          .select("*")
-          .eq("id", profile.couple_id)
-          .single();
-        setCouple(coupleData);
-      }
-
       const params = new URLSearchParams();
       if (filterVal !== "all") params.set("filter", filterVal);
       if (searchVal) params.set("search", searchVal);
 
-      const res = await fetch(`/api/memory?${params.toString()}`);
+      const queryString = params.toString();
+      const res = await fetch(
+        `/api/memory${queryString ? `?${queryString}` : ""}`,
+        { cache: "no-store" }
+      );
+
+      if (res.status === 401) {
+        router.push("/auth/login");
+        return;
+      }
+
+      if (!res.ok) {
+        setLoading(false);
+        return;
+      }
+
       const data = await res.json();
 
       setEntries(data.entries || {});
       setOnThisDay(data.onThisDay || []);
+      setCouple(data.couple || null);
+      setCurrentUserId(data.currentUserId || "");
       setLoading(false);
     },
-    [supabase]
+    [router]
   );
 
   useEffect(() => {

@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { createClient } from "@/lib/supabase/client";
 import { AppShell } from "@/components/layout/AppShell";
 import { Card } from "@/components/ui/Card";
 import { Loading } from "@/components/ui/Loading";
@@ -27,58 +26,35 @@ export default function AnswersPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const coupleId = searchParams.get("couple");
-  const supabase = createClient();
 
   const loadData = useCallback(async () => {
     setLoading(true);
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      router.push("/auth/login");
-      return;
-    }
 
     if (!coupleId) {
       router.push("/couples");
       return;
     }
 
-    setCurrentUserId(user.id);
+    const res = await fetch(`/api/daily-questions?couple_id=${coupleId}`, {
+      cache: "no-store",
+    });
 
-    // Couple
-    const { data: coupleDetail } = await supabase
-      .from("couples")
-      .select("*")
-      .eq("id", coupleId)
-      .single();
-    setCouple(coupleDetail);
-
-    // Partner name — try direct query, fall back to "Them"
-    if (coupleDetail) {
-      const partnerId =
-        coupleDetail.user_1_id === user.id
-          ? coupleDetail.user_2_id
-          : coupleDetail.user_1_id;
-      if (partnerId) {
-        const { data: partnerProfile } = await supabase
-          .from("users")
-          .select("display_name, email")
-          .eq("id", partnerId)
-          .single();
-        if (partnerProfile) {
-          setPartnerName(
-            partnerProfile.display_name || partnerProfile.email || ""
-          );
-        }
-      }
+    if (res.status === 401) {
+      router.push("/auth/login");
+      return;
     }
 
-    // Questions + answers — API returns everything via service client (bypasses RLS)
-    // Just trust the API response. Do NOT re-query answers from browser.
-    const res = await fetch(`/api/daily-questions?couple_id=${coupleId}`);
+    if (!res.ok) {
+      setLoading(false);
+      return;
+    }
+
     const data = await res.json();
+    const responseUserId = data.currentUserId || "";
+
+    setCurrentUserId(responseUserId);
+    setCouple(data.couple || null);
+    setPartnerName(data.partnerName || "");
 
     if (data.questions) {
       const qs: DailyQuestionWithDetails[] = data.questions;
@@ -86,7 +62,7 @@ export default function AnswersPage() {
 
       // Check if user has answered all questions
       const myAnswerCount = qs.filter((q) =>
-        q.answers.some((a) => a.user_id === user.id)
+        q.answers.some((a) => a.user_id === responseUserId)
       ).length;
 
       if (myAnswerCount < qs.length) {
@@ -99,8 +75,7 @@ export default function AnswersPage() {
     }
 
     setLoading(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [coupleId]);
+  }, [coupleId, router]);
 
   useEffect(() => {
     loadData();

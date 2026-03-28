@@ -11,7 +11,7 @@ export async function GET() {
 
   const { data: profile } = await supabase
     .from("users")
-    .select("*")
+    .select("id, email, display_name, timezone, couple_id")
     .eq("id", user.id)
     .single();
 
@@ -21,15 +21,20 @@ export async function GET() {
 
   // If user has a couple, get partner info
   let partner = null;
+  let couple = null;
   if (profile.couple_id) {
-    const { data: couple } = await supabase
+    const { data: coupleData } = await supabase
       .from("couples")
-      .select("*")
+      .select(
+        "id, user_1_id, user_2_id, invite_code, timezone, streak_count, last_streak_date, created_at"
+      )
       .eq("id", profile.couple_id)
       .single();
 
-    if (couple) {
-      const partnerId = couple.user_1_id === user.id ? couple.user_2_id : couple.user_1_id;
+    couple = coupleData;
+
+    if (coupleData) {
+      const partnerId = coupleData.user_1_id === user.id ? coupleData.user_2_id : coupleData.user_1_id;
       if (partnerId) {
         const serviceClient = await createServiceClient();
         const { data: partnerData } = await serviceClient
@@ -43,7 +48,7 @@ export async function GET() {
   }
 
   return NextResponse.json(
-    { user: profile, partner },
+    { user: profile, partner, couple },
     { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } }
   );
 }

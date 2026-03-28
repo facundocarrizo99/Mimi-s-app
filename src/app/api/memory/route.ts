@@ -28,6 +28,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "No couple found" }, { status: 404 });
   }
 
+  const { data: couple } = await supabase
+    .from("couples")
+    .select("id, timezone, streak_count")
+    .eq("id", profile.couple_id)
+    .single();
+
   // Base query: get daily questions with answers from past days
   let query = supabase
     .from("daily_questions")
@@ -54,7 +60,14 @@ export async function GET(request: NextRequest) {
         favs.map((f) => f.daily_question_id)
       );
     } else {
-      return NextResponse.json({ entries: [], total: 0 });
+      return NextResponse.json({
+        entries: {},
+        total: 0,
+        onThisDay: [],
+        couple,
+        currentUserId: user.id,
+        page,
+      });
     }
   }
 
@@ -72,10 +85,19 @@ export async function GET(request: NextRequest) {
       .eq("category", filter);
 
     if (catQuestions) {
-      query = query.in(
-        "question_id",
-        catQuestions.map((q) => q.id)
-      );
+      const categoryQuestionIds = catQuestions.map((q) => q.id);
+      if (categoryQuestionIds.length === 0) {
+        return NextResponse.json({
+          entries: {},
+          total: 0,
+          onThisDay: [],
+          couple,
+          currentUserId: user.id,
+          page,
+        });
+      }
+
+      query = query.in("question_id", categoryQuestionIds);
     }
   }
 
@@ -108,18 +130,24 @@ export async function GET(request: NextRequest) {
   const day = String(today.getDate()).padStart(2, "0");
   const thisYear = today.getFullYear();
 
-  const { data: onThisDay } = await supabase
-    .from("daily_questions")
-    .select("*, question:questions(*), answers(*)")
-    .eq("couple_id", profile.couple_id)
-    .like("question_date", `%-${month}-${day}`)
-    .neq("question_date", `${thisYear}-${month}-${day}`)
-    .order("question_date", { ascending: false });
+  let onThisDay: unknown[] = [];
+  if (!search && (!filter || filter === "all") && page === 1) {
+    const { data } = await supabase
+      .from("daily_questions")
+      .select("*, question:questions(*), answers(*)")
+      .eq("couple_id", profile.couple_id)
+      .like("question_date", `%-${month}-${day}`)
+      .neq("question_date", `${thisYear}-${month}-${day}`)
+      .order("question_date", { ascending: false });
+    onThisDay = data || [];
+  }
 
   return NextResponse.json({
     entries: grouped,
     total: count || 0,
-    onThisDay: onThisDay || [],
+    onThisDay,
+    couple,
+    currentUserId: user.id,
     page,
   });
 }

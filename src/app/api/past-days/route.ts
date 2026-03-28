@@ -5,6 +5,18 @@ export const dynamic = "force-dynamic";
 
 const DATES_PER_PAGE = 30;
 const IN_BATCH_SIZE = 200;
+const PAST_DAYS_CACHE_TTL_MS = 300_000;
+const PAST_DAYS_MAX_CACHE_ENTRIES = 200;
+
+const pastDaysDateCache = new Map<
+  string,
+  {
+    expiresAt: number;
+    allDates: string[];
+    dateMap: Record<string, string[]>;
+    answerUsersByQuestionId: Record<string, string[]>;
+  }
+>();
 
 /**
  * GET /api/past-days?couple_id=...&page=1
@@ -28,11 +40,15 @@ export async function GET(request: NextRequest) {
   const dateParam = searchParams.get("date");
   const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10) || 1);
 
-  const { data: profile } = await supabase
-    .from("users")
-    .select("couple_id, timezone")
-    .eq("id", user.id)
-    .single();
+  let profile: { couple_id: string | null; timezone: string | null } | null = null;
+  if (!coupleIdParam) {
+    const { data } = await supabase
+      .from("users")
+      .select("couple_id, timezone")
+      .eq("id", user.id)
+      .single();
+    profile = data;
+  }
 
   const couple_id = coupleIdParam || profile?.couple_id;
 
@@ -43,7 +59,7 @@ export async function GET(request: NextRequest) {
   // Verify user belongs to this couple
   const { data: coupleCheck } = await supabase
     .from("couples")
-    .select("id, timezone")
+    .select("id, timezone, streak_count, user_1_id, user_2_id")
     .eq("id", couple_id)
     .or(`user_1_id.eq.${user.id},user_2_id.eq.${user.id}`)
     .single();
@@ -67,17 +83,18 @@ export async function GET(request: NextRequest) {
         { status: 400 }
       );
     }
-    return getQuestionsForDate(couple_id, dateParam, user.id);
+    return getQuestionsForDate(couple_id, dateParam, user.id, coupleCheck);
   }
 
-  return getPastDatesList(couple_id, today, user.id, page);
+  return getPastDatesList(couple_id, today, user.id, page, coupleCheck);
 }
 
 async function getPastDatesList(
   coupleId: string,
   today: string,
   userId: string,
-  page: number
+  page: number,
+  couple: { id: string; timezone: string | null; streak_count: number | null }
 ) {
   const serviceClient = await createServiceClient();
 
@@ -86,65 +103,83 @@ async function getPastDatesList(
   // so we fetch questions scoped to a date range via ordering + limit.
   // Instead, query all question_date values and deduplicate in JS.
   // This is efficient because we only select (id, question_date) — small rows.
-  const { data: allQuestions } = await serviceClient
-    .from("daily_questions")
-    .select("id, question_date")
-    .eq("couple_id", coupleId)
-    .order("question_date", { ascending: false });
+  const now = Date.now();
+  const cached = pastDaysDateCache.get(coupleId);
 
-  if (!allQuestions || allQuestions.length === 0) {
-    return jsonResponse({ dates: [], page, hasMore: false });
+  let dateMap: Record<string, string[]>;
+  let allDates: string[];
+  let answerUsersByQuestionId: Record<string, string[]>;
+
+  if (cached && cached.expiresAt > now) {
+    dateMap = cached.dateMap;
+    allDates = cached.allDates;
+    answerUsersByQuestionId = cached.answerUsersByQuestionId;
+  } else {
+    const { data: allQuestions } = await serviceClient
+      .from("daily_questions")
+      .select("id, question_date")
+      .eq("couple_id", coupleId)
+      .order("question_date", { ascending: false });
+
+    if (!allQuestions || allQuestions.length === 0) {
+      return jsonResponse({ dates: [], page, hasMore: false, couple });
+    }
+
+    dateMap = {};
+    for (const q of allQuestions) {
+      if (!dateMap[q.question_date]) dateMap[q.question_date] = [];
+      dateMap[q.question_date].push(q.id);
+    }
+
+    allDates = Object.keys(dateMap).sort((a, b) => b.localeCompare(a));
+    answerUsersByQuestionId = {};
+
+    const allQuestionIds = allQuestions.map((q) => q.id);
+    for (let i = 0; i < allQuestionIds.length; i += IN_BATCH_SIZE) {
+      const batch = allQuestionIds.slice(i, i + IN_BATCH_SIZE);
+      const { data: answersInBatch } = await serviceClient
+        .from("answers")
+        .select("daily_question_id, user_id")
+        .in("daily_question_id", batch);
+
+      for (const answer of answersInBatch || []) {
+        if (!answerUsersByQuestionId[answer.daily_question_id]) {
+          answerUsersByQuestionId[answer.daily_question_id] = [];
+        }
+
+        if (
+          !answerUsersByQuestionId[answer.daily_question_id].includes(
+            answer.user_id
+          )
+        ) {
+          answerUsersByQuestionId[answer.daily_question_id].push(answer.user_id);
+        }
+      }
+    }
+
+    if (pastDaysDateCache.size >= PAST_DAYS_MAX_CACHE_ENTRIES) {
+      const oldestKey = pastDaysDateCache.keys().next().value;
+      if (oldestKey) {
+        pastDaysDateCache.delete(oldestKey);
+      }
+    }
+
+    pastDaysDateCache.set(coupleId, {
+      expiresAt: now + PAST_DAYS_CACHE_TTL_MS,
+      dateMap,
+      allDates,
+      answerUsersByQuestionId,
+    });
   }
 
-  // Group question IDs by date
-  const dateMap: Record<string, string[]> = {};
-  for (const q of allQuestions) {
-    if (!dateMap[q.question_date]) dateMap[q.question_date] = [];
-    dateMap[q.question_date].push(q.id);
-  }
-
-  // Sort dates descending and paginate
-  const allDates = Object.keys(dateMap).sort((a, b) => b.localeCompare(a));
   const start = (page - 1) * DATES_PER_PAGE;
   const paginatedDates = allDates.slice(start, start + DATES_PER_PAGE);
   const hasMore = start + DATES_PER_PAGE < allDates.length;
 
   if (paginatedDates.length === 0) {
-    return jsonResponse({ dates: [], page, hasMore: false });
+    return jsonResponse({ dates: [], page, hasMore: false, couple });
   }
 
-  // Collect question IDs only for the paginated dates
-  const questionIdsForPage: string[] = [];
-  for (const d of paginatedDates) {
-    questionIdsForPage.push(...dateMap[d]);
-  }
-
-  // Batch .in() queries to stay under PostgREST limits
-  const myAnsweredIds = new Set<string>();
-  const partnerAnsweredIds = new Set<string>();
-
-  for (let i = 0; i < questionIdsForPage.length; i += IN_BATCH_SIZE) {
-    const batch = questionIdsForPage.slice(i, i + IN_BATCH_SIZE);
-
-    const [myRes, partnerRes] = await Promise.all([
-      serviceClient
-        .from("answers")
-        .select("daily_question_id")
-        .eq("user_id", userId)
-        .in("daily_question_id", batch),
-      serviceClient
-        .from("answers")
-        .select("daily_question_id")
-        .neq("user_id", userId)
-        .in("daily_question_id", batch),
-    ]);
-
-    for (const a of myRes.data || []) myAnsweredIds.add(a.daily_question_id);
-    for (const a of partnerRes.data || [])
-      partnerAnsweredIds.add(a.daily_question_id);
-  }
-
-  // Build the date list
   const todayKey = normalizeDateKey(today);
 
   const dates = paginatedDates.map((date) => {
@@ -155,10 +190,12 @@ async function getPastDatesList(
     const questionIds = dateMap[date];
     const totalQuestions = questionIds.length;
     const myAnswerCount = questionIds.filter((id) =>
-      myAnsweredIds.has(id)
+      (answerUsersByQuestionId[id] || []).includes(userId)
     ).length;
     const partnerAnswerCount = questionIds.filter((id) =>
-      partnerAnsweredIds.has(id)
+      (answerUsersByQuestionId[id] || []).some(
+        (answerUserId) => answerUserId !== userId
+      )
     ).length;
 
     return {
@@ -174,15 +211,37 @@ async function getPastDatesList(
     };
   });
 
-  return jsonResponse({ dates, page, hasMore });
+  return jsonResponse({ dates, page, hasMore, couple });
 }
 
 async function getQuestionsForDate(
   coupleId: string,
   date: string,
-  userId: string
+  userId: string,
+  couple: {
+    id: string;
+    timezone: string | null;
+    streak_count: number | null;
+    user_1_id: string;
+    user_2_id: string | null;
+  }
 ) {
   const serviceClient = await createServiceClient();
+
+  const partnerId =
+    couple.user_1_id === userId ? couple.user_2_id : couple.user_1_id;
+  let partnerName = "";
+  if (partnerId) {
+    const { data: partnerProfile } = await serviceClient
+      .from("users")
+      .select("display_name, email")
+      .eq("id", partnerId)
+      .maybeSingle();
+    partnerName =
+      partnerProfile?.display_name ||
+      partnerProfile?.email ||
+      "";
+  }
 
   // Use service client for everything — consistent, bypasses RLS
   const { data: questions } = await serviceClient
@@ -193,7 +252,13 @@ async function getQuestionsForDate(
     .order("position");
 
   if (!questions || questions.length === 0) {
-    return jsonResponse({ questions: [], date });
+    return jsonResponse({
+      questions: [],
+      date,
+      couple,
+      currentUserId: userId,
+      partnerName,
+    });
   }
 
   const questionIds = questions.map((dq) => dq.id);
@@ -220,7 +285,13 @@ async function getQuestionsForDate(
     favorites: favorites.filter((f) => f.daily_question_id === dq.id),
   }));
 
-  return jsonResponse({ questions: withDetails, date });
+  return jsonResponse({
+    questions: withDetails,
+    date,
+    couple,
+    currentUserId: userId,
+    partnerName,
+  });
 }
 
 function jsonResponse(data: Record<string, unknown>) {

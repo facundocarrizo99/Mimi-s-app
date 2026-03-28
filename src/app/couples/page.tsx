@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { createClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui/Card";
 import { Loading } from "@/components/ui/Loading";
 
@@ -41,41 +40,52 @@ export default function CouplesPage() {
   const [copied, setCopied] = useState<string | null>(null);
 
   const router = useRouter();
-  const supabase = createClient();
+  const inFlightRef = useRef(false);
 
   async function loadCouples() {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      router.push("/auth/login");
+    if (inFlightRef.current) {
       return;
     }
 
-    // Get user profile for display name
-    const { data: profileData } = await supabase
-      .from("users")
-      .select("display_name")
-      .eq("id", user.id)
-      .single();
+    inFlightRef.current = true;
 
-    if (profileData) {
-      setDisplayName(profileData.display_name || "");
+    try {
+      const couplesResponse = await fetch("/api/couples", { cache: "no-store" });
+
+      if (couplesResponse.status === 401) {
+        setLoading(false);
+        router.push("/auth/login");
+        return;
+      }
+
+      if (!couplesResponse.ok) {
+        console.error("Failed to load couples", {
+          status: couplesResponse.status,
+          statusText: couplesResponse.statusText,
+        });
+        setLoading(false);
+        return;
+      }
+
+      const data = await couplesResponse.json();
+      const fetchedCouples: CoupleWithPartner[] = data.couples || [];
+      setDisplayName(data.currentUserDisplayName || "");
+
+      // If user has exactly 1 complete couple, auto-redirect to daily
+      const completeCouples = fetchedCouples.filter((c) => c.partner);
+      if (completeCouples.length === 1 && fetchedCouples.length === 1) {
+        router.push(`/daily?couple=${completeCouples[0].id}`);
+        return;
+      }
+
+      setCouples(fetchedCouples);
+      setLoading(false);
+    } catch (error) {
+      console.error("Failed to bootstrap couples page", error);
+      setLoading(false);
+    } finally {
+      inFlightRef.current = false;
     }
-
-    const res = await fetch("/api/couples", { cache: "no-store" });
-    const data = await res.json();
-    const fetchedCouples: CoupleWithPartner[] = data.couples || [];
-
-    // If user has exactly 1 complete couple, auto-redirect to daily
-    const completeCouples = fetchedCouples.filter((c) => c.partner);
-    if (completeCouples.length === 1 && fetchedCouples.length === 1) {
-      router.push(`/daily?couple=${completeCouples[0].id}`);
-      return;
-    }
-
-    setCouples(fetchedCouples);
-    setLoading(false);
   }
 
   useEffect(() => {

@@ -15,7 +15,9 @@ export async function GET() {
   // Get all couples where user is user_1 or user_2
   const { data: couples, error } = await supabase
     .from("couples")
-    .select("*")
+    .select(
+      "id, user_1_id, user_2_id, invite_code, timezone, streak_count, last_streak_date, created_at"
+    )
     .or(`user_1_id.eq.${user.id},user_2_id.eq.${user.id}`)
     .order("created_at", { ascending: false });
 
@@ -28,59 +30,100 @@ export async function GET() {
   // which breaks in a multi-couple scenario)
   const serviceClient = await createServiceClient();
 
-  // For each couple, get partner info and today's progress
-  const couplesWithDetails = await Promise.all(
-    (couples || []).map(async (couple) => {
-      const partnerId =
-        couple.user_1_id === user.id ? couple.user_2_id : couple.user_1_id;
-      let partner = null;
+  const couplesList = couples || [];
+  const partnerIds = couplesList
+    .map((couple) =>
+      couple.user_1_id === user.id ? couple.user_2_id : couple.user_1_id
+    )
+    .filter((partnerId): partnerId is string => Boolean(partnerId));
 
-      if (partnerId) {
-        const { data: partnerData } = await serviceClient
-          .from("users")
-          .select("id, display_name, email")
-          .eq("id", partnerId)
-          .single();
-        partner = partnerData;
-      }
+  const partnersById = new Map<string, { id: string; display_name: string; email: string }>();
 
-      // Get today's progress for this couple
-      const timezone = couple.timezone || "America/New_York";
-      const today = getDateInTimezone(timezone);
+  const todayByCoupleId = new Map<string, string>();
+  const uniqueDates = new Set<string>();
+  for (const couple of couplesList) {
+    const today = getDateInTimezone(couple.timezone || "America/New_York");
+    todayByCoupleId.set(couple.id, today);
+    uniqueDates.add(today);
+  }
 
-      const { data: todayQuestions } = await supabase
+  const coupleIds = couplesList.map((couple) => couple.id);
+  const partnerPromise = partnerIds.length > 0
+    ? serviceClient
+        .from("users")
+        .select("id, display_name, email")
+        .in("id", partnerIds)
+    : Promise.resolve({ data: [] as { id: string; display_name: string; email: string }[] });
+
+  const dailyQuestionsPromise = coupleIds.length > 0 && uniqueDates.size > 0
+    ? serviceClient
         .from("daily_questions")
-        .select("id")
-        .eq("couple_id", couple.id)
-        .eq("question_date", today);
+        .select("id, couple_id, question_date")
+        .in("couple_id", coupleIds)
+        .in("question_date", Array.from(uniqueDates))
+    : Promise.resolve({ data: [] as { id: string; couple_id: string; question_date: string }[] });
 
-      let answeredCount = 0;
-      const totalQuestions = todayQuestions?.length || 0;
+  const [partnersResult, dailyQuestionsResult] = await Promise.all([
+    partnerPromise,
+    dailyQuestionsPromise,
+  ]);
 
-      if (todayQuestions && todayQuestions.length > 0) {
-        const questionIds = todayQuestions.map((q) => q.id);
-        const { data: myAnswers } = await supabase
-          .from("answers")
-          .select("id")
-          .in("daily_question_id", questionIds)
-          .eq("user_id", user.id);
-        answeredCount = myAnswers?.length || 0;
-      }
+  for (const partner of partnersResult.data || []) {
+    partnersById.set(partner.id, partner);
+  }
 
-      return {
-        ...couple,
-        partner,
-        today_progress: {
-          answered: answeredCount,
-          total: totalQuestions,
-          date: today,
-        },
-      };
-    })
-  );
+  const dailyQuestions = dailyQuestionsResult.data || [];
+
+  const questionIdsByCoupleId = new Map<string, string[]>();
+  for (const question of dailyQuestions) {
+    const expectedDate = todayByCoupleId.get(question.couple_id);
+    if (!expectedDate || expectedDate !== question.question_date) continue;
+
+    const existing = questionIdsByCoupleId.get(question.couple_id) || [];
+    existing.push(question.id);
+    questionIdsByCoupleId.set(question.couple_id, existing);
+  }
+
+  const allQuestionIds = Array.from(questionIdsByCoupleId.values()).flat();
+  const answeredQuestionIds = new Set<string>();
+
+  if (allQuestionIds.length > 0) {
+    const { data: myAnswers } = await serviceClient
+      .from("answers")
+      .select("daily_question_id")
+      .eq("user_id", user.id)
+      .in("daily_question_id", allQuestionIds);
+
+    for (const answer of myAnswers || []) {
+      answeredQuestionIds.add(answer.daily_question_id);
+    }
+  }
+
+  const couplesWithDetails = couplesList.map((couple) => {
+    const partnerId =
+      couple.user_1_id === user.id ? couple.user_2_id : couple.user_1_id;
+
+    const questionIds = questionIdsByCoupleId.get(couple.id) || [];
+    const answeredCount = questionIds.filter((id) => answeredQuestionIds.has(id)).length;
+    const today = todayByCoupleId.get(couple.id) || getDateInTimezone(couple.timezone || "America/New_York");
+
+    return {
+      ...couple,
+      partner: partnerId ? partnersById.get(partnerId) || null : null,
+      today_progress: {
+        answered: answeredCount,
+        total: questionIds.length,
+        date: today,
+      },
+    };
+  });
 
   return NextResponse.json(
-    { couples: couplesWithDetails },
+    {
+      couples: couplesWithDetails,
+      currentUserDisplayName:
+        user.user_metadata?.display_name || user.email?.split("@")[0] || "",
+    },
     { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } }
   );
 }

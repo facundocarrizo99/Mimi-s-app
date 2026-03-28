@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import { AppShell } from "@/components/layout/AppShell";
@@ -50,38 +50,67 @@ export default function SettingsPage() {
   const [passkeyBusy, setPasskeyBusy] = useState(false);
   const [passkeyMessage, setPasskeyMessage] = useState("");
   const [passkeyError, setPasskeyError] = useState("");
-
-  const supabase = createClient();
+  const inFlightRef = useRef(false);
 
   const loadData = useCallback(async () => {
-    const res = await fetch("/api/couple");
-    const data = await res.json();
-
-    setProfile(data.user);
-    setPartner(data.partner);
-    setDisplayName(data.user?.display_name || "");
-    setTimezone(data.user?.timezone || "America/New_York");
-
-    if (data.user?.couple_id) {
-      const { data: coupleData } = await supabase
-        .from("couples")
-        .select("*")
-        .eq("id", data.user.couple_id)
-        .single();
-      setCouple(coupleData);
+    if (inFlightRef.current) {
+      return;
     }
 
-    if (typeof window !== "undefined") {
-      setPasskeySupported(
-        Boolean(window.PublicKeyCredential && navigator.credentials)
-      );
+    inFlightRef.current = true;
+    const supabase = createClient();
+    try {
+      const coupleResponse = await fetch("/api/couple", { cache: "no-store" });
+
+      if (coupleResponse.status === 401) {
+        window.location.href = "/auth/login";
+        return;
+      }
+
+      if (!coupleResponse.ok) {
+        console.error("Failed to load settings bootstrap", {
+          status: coupleResponse.status,
+          statusText: coupleResponse.statusText,
+        });
+        return;
+      }
+
+      const data = await coupleResponse.json();
+
+      setProfile(data.user || null);
+      setPartner(data.partner || null);
+      setCouple(data.couple || null);
+      setDisplayName(data.user?.display_name || "");
+      setTimezone(data.user?.timezone || "America/New_York");
+
+      if (typeof window !== "undefined") {
+        const supported = Boolean(
+          window.PublicKeyCredential && navigator.credentials
+        );
+        setPasskeySupported(supported);
+
+        if (supported) {
+          void supabase.auth.mfa
+            .listFactors()
+            .then(({ data: factorData }) => {
+              setPasskeys(
+                (factorData?.all || []).filter(
+                  (f) => f.factor_type === "webauthn"
+                )
+              );
+            })
+            .catch(() => {
+              // Ignore passkey load errors during bootstrap to avoid blocking settings.
+            });
+        } else {
+          setPasskeys([]);
+        }
+      }
+    } finally {
+      setLoading(false);
+      inFlightRef.current = false;
     }
-
-    const { data: factorData } = await supabase.auth.mfa.listFactors();
-    setPasskeys((factorData?.all || []).filter((f) => f.factor_type === "webauthn"));
-
-    setLoading(false);
-  }, [supabase]);
+  }, []);
 
   useEffect(() => {
     loadData();
@@ -89,6 +118,7 @@ export default function SettingsPage() {
 
   async function handleSave() {
     if (!profile) return;
+    const supabase = createClient();
     setSaving(true);
 
     await supabase
@@ -112,16 +142,19 @@ export default function SettingsPage() {
   }
 
   async function handleSignOut() {
+    const supabase = createClient();
     await supabase.auth.signOut();
     window.location.href = "/auth/login";
   }
 
   async function refreshPasskeys() {
+    const supabase = createClient();
     const { data: factorData } = await supabase.auth.mfa.listFactors();
     setPasskeys((factorData?.all || []).filter((f) => f.factor_type === "webauthn"));
   }
 
   async function handleCreatePasskey() {
+    const supabase = createClient();
     setPasskeyBusy(true);
     setPasskeyError("");
     setPasskeyMessage("");
@@ -149,6 +182,7 @@ export default function SettingsPage() {
   }
 
   async function handleVerifyPasskey() {
+    const supabase = createClient();
     setPasskeyBusy(true);
     setPasskeyError("");
     setPasskeyMessage("");
@@ -175,6 +209,7 @@ export default function SettingsPage() {
   }
 
   async function handleDeletePasskey(factorId: string) {
+    const supabase = createClient();
     setPasskeyBusy(true);
     setPasskeyError("");
     setPasskeyMessage("");

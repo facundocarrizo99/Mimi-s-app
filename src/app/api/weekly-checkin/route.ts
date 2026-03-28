@@ -39,11 +39,15 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const coupleIdParam = searchParams.get("couple_id");
 
-  const { data: profile } = await supabase
-    .from("users")
-    .select("couple_id, timezone")
-    .eq("id", user.id)
-    .single();
+  let profile: { couple_id: string | null; timezone: string | null } | null = null;
+  if (!coupleIdParam) {
+    const { data } = await supabase
+      .from("users")
+      .select("couple_id, timezone")
+      .eq("id", user.id)
+      .single();
+    profile = data;
+  }
 
   const couple_id = coupleIdParam || profile?.couple_id;
 
@@ -54,7 +58,7 @@ export async function GET(request: NextRequest) {
   // Verify user belongs to this couple
   const { data: couple } = await supabase
     .from("couples")
-    .select("id, timezone")
+    .select("id, timezone, streak_count")
     .eq("id", couple_id)
     .or(`user_1_id.eq.${user.id},user_2_id.eq.${user.id}`)
     .single();
@@ -68,26 +72,24 @@ export async function GET(request: NextRequest) {
   // Calculate the start of the current week (Sunday)
   const weekStartDate = normalizeDateToISO(getWeekStartDate(timezone));
 
-  // Check if weekly check-in exists for this week
-  const { data: existingCheckin } = await supabase
+  // Check if weekly check-in exists for this week, including answers
+  const { data: existingCheckinWithAnswers } = await supabase
     .from("weekly_checkins")
-    .select("*")
+    .select("*, answers:weekly_checkin_answers(*)")
     .eq("couple_id", couple_id)
     .eq("week_start_date", weekStartDate)
-    .single();
+    .maybeSingle();
 
-  if (existingCheckin) {
-    // Load answers using authenticated client (RLS handles authorization)
-    const { data: answers } = await supabase
-      .from("weekly_checkin_answers")
-      .select("*")
-      .eq("checkin_id", existingCheckin.id);
+  if (existingCheckinWithAnswers) {
+    const { answers, ...existingCheckin } = existingCheckinWithAnswers;
 
     return NextResponse.json(
       { 
         checkin: existingCheckin,
         answers: answers || [],
-        weekStartDate 
+        weekStartDate,
+        currentUserId: user.id,
+        couple,
       },
       { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } }
     );
@@ -166,7 +168,9 @@ export async function GET(request: NextRequest) {
     { 
       checkin: newCheckin,
       answers: [],
-      weekStartDate 
+      weekStartDate,
+      currentUserId: user.id,
+      couple,
     },
     { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } }
   );

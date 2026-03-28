@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { createClient } from "@/lib/supabase/client";
 import { AppShell } from "@/components/layout/AppShell";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -30,54 +29,74 @@ export default function WeeklyCheckinPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const coupleId = searchParams.get("couple");
-  const supabase = createClient();
+  const inFlightKeyRef = useRef<string | null>(null);
 
   const loadData = useCallback(async () => {
-    setLoading(true);
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    
-    if (!user) {
-      router.push("/auth/login");
-      return;
-    }
-
     if (!coupleId) {
       router.push("/couples");
+      setLoading(false);
       return;
     }
 
-    setUserId(user.id);
-
-    // Load couple info
-    const { data: coupleDetail } = await supabase
-      .from("couples")
-      .select("*")
-      .eq("id", coupleId)
-      .single();
-    
-    setCouple(coupleDetail);
-
-    // Load weekly check-in from API
-    const res = await fetch(`/api/weekly-checkin?couple_id=${coupleId}`);
-    const data = await res.json();
-
-    if (data.checkin) {
-      setCheckin(data.checkin);
-      setAnswers(data.answers || []);
-      setWeekStartDate(data.weekStartDate);
-      
-      // Pre-fill existing answer
-      const myAnswer = data.answers?.find((a: WeeklyCheckinAnswer) => a.user_id === user.id);
-      if (myAnswer) {
-        setMyAnswerText(myAnswer.answer_text);
-      }
+    if (inFlightKeyRef.current === coupleId) {
+      return;
     }
 
-    setLoading(false);
-  }, [coupleId, router, supabase]);
+    inFlightKeyRef.current = coupleId;
+    setLoading(true);
+
+    try {
+      const checkinResponse = await fetch(`/api/weekly-checkin?couple_id=${coupleId}`, {
+        cache: "no-store",
+      });
+
+      if (checkinResponse.status === 401) {
+        router.push("/auth/login");
+        return;
+      }
+
+      if (checkinResponse.status === 403 || checkinResponse.status === 404) {
+        router.push("/couples");
+        return;
+      }
+
+      if (!checkinResponse.ok) {
+        console.error("Failed to load weekly check-in", {
+          status: checkinResponse.status,
+          statusText: checkinResponse.statusText,
+        });
+        return;
+      }
+
+      const data = await checkinResponse.json();
+      if (!data || data.error) {
+        console.error("Weekly check-in API returned an invalid payload", data);
+        return;
+      }
+
+      setUserId(data.currentUserId || "");
+      setCouple(data.couple ?? null);
+
+      if (data.checkin) {
+        setCheckin(data.checkin);
+        setAnswers(data.answers || []);
+        setWeekStartDate(data.weekStartDate);
+
+        // Pre-fill existing answer
+        const myAnswer = data.answers?.find((a: WeeklyCheckinAnswer) => a.user_id === data.currentUserId);
+        if (myAnswer) {
+          setMyAnswerText(myAnswer.answer_text);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load weekly-checkin page data", error);
+    } finally {
+      if (inFlightKeyRef.current === coupleId) {
+        inFlightKeyRef.current = null;
+      }
+      setLoading(false);
+    }
+  }, [coupleId, router]);
 
   useEffect(() => {
     loadData();

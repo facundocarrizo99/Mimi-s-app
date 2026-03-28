@@ -3,38 +3,34 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { createClient } from "@/lib/supabase/client";
 
 export default function Home() {
   const [checking, setChecking] = useState(true);
   const router = useRouter();
-  const supabase = createClient();
 
   useEffect(() => {
     async function check() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (user) {
-        // Get the user's couple to redirect to monthly summary
-        const { data: couples } = await supabase
-          .from("couples")
-          .select("id")
-          .or(`user_1_id.eq.${user.id},user_2_id.eq.${user.id}`)
-          .limit(1)
-          .single();
-        
-        if (couples?.id) {
-          router.push(`/monthly-summary?couple=${couples.id}`);
-        } else {
-          router.push("/couples");
-        }
-      } else {
+      const res = await fetch("/api/couple", { cache: "no-store" });
+
+      if (res.status === 401) {
         setChecking(false);
+        return;
+      }
+
+      if (!res.ok) {
+        router.push("/couples");
+        return;
+      }
+
+      const data = await res.json();
+      if (data.couple?.id) {
+        router.push(`/monthly-summary?couple=${data.couple.id}`);
+      } else {
+        router.push("/couples");
       }
     }
     check();
-  }, [supabase, router]);
+  }, [router]);
 
   if (checking) {
     return (
