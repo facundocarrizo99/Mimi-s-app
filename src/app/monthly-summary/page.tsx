@@ -153,6 +153,22 @@ export default function MonthlySummaryPage() {
               </option>
             ))}
           </select>
+
+          {/* Action Buttons */}
+          <div className="flex gap-3 justify-center mt-4">
+            <button
+              onClick={() => router.push(`/daily?couple=${coupleId}`)}
+              className="px-4 py-2 rounded-lg bg-[var(--md-sys-color-primary)] text-white text-sm font-medium hover:opacity-90 transition-opacity"
+            >
+              Today's Questions
+            </button>
+            <button
+              onClick={() => router.push(`/past-days?couple=${coupleId}`)}
+              className="px-4 py-2 rounded-lg bg-[var(--md-sys-color-secondary)] text-white text-sm font-medium hover:opacity-90 transition-opacity"
+            >
+              Past Days
+            </button>
+          </div>
         </motion.div>
 
         {/* Key Stats Grid */}

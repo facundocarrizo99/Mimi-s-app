@@ -16,7 +16,19 @@ export default function Home() {
         data: { user },
       } = await supabase.auth.getUser();
       if (user) {
-        router.push("/couples");
+        // Get the user's couple to redirect to monthly summary
+        const { data: couples } = await supabase
+          .from("couples")
+          .select("id")
+          .or(`user_1_id.eq.${user.id},user_2_id.eq.${user.id}`)
+          .limit(1)
+          .single();
+        
+        if (couples?.id) {
+          router.push(`/monthly-summary?couple=${couples.id}`);
+        } else {
+          router.push("/couples");
+        }
       } else {
         setChecking(false);
       }

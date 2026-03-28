@@ -10,7 +10,7 @@ interface AppShellProps {
   coupleId?: string;
 }
 
-function NavIcon({ kind }: { kind: "spaces" | "today" | "history" | "settings" | "weekly" | "summary" }) {
+function NavIcon({ kind }: { kind: "spaces" | "today" | "history" | "settings" | "weekly" }) {
   const common = "w-5 h-5";
   if (kind === "spaces") {
     return (
@@ -37,16 +37,6 @@ function NavIcon({ kind }: { kind: "spaces" | "today" | "history" | "settings" |
       </svg>
     );
   }
-  if (kind === "summary") {
-    return (
-      <svg viewBox="0 0 24 24" fill="none" className={common} aria-hidden>
-        <rect x="4" y="4" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
-        <rect x="13" y="4" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
-        <rect x="4" y="13" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
-        <rect x="13" y="13" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
-      </svg>
-    );
-  }
   if (kind === "history") {
     return (
       <svg viewBox="0 0 24 24" fill="none" className={common} aria-hidden>
@@ -67,10 +57,10 @@ export function AppShell({ children, streakCount, coupleId }: AppShellProps) {
   const pathname = usePathname();
 
   const navItems = [
-    { href: "/couples", matchPath: "/couples", label: "Spaces", icon: "spaces" as const },
+    { href: coupleId ? `/monthly-summary?couple=${coupleId}` : "/couples", matchPath: "/monthly-summary", label: "Home", icon: "spaces" as const },
     { href: coupleId ? `/daily?couple=${coupleId}` : "/couples", matchPath: "/daily", label: "Today", icon: "today" as const },
     { href: coupleId ? `/weekly-checkin?couple=${coupleId}` : "/couples", matchPath: "/weekly-checkin", label: "Weekly", icon: "weekly" as const },
-    { href: coupleId ? `/monthly-summary?couple=${coupleId}` : "/couples", matchPath: "/monthly-summary", label: "Summary", icon: "summary" as const },
+    { href: coupleId ? `/past-days?couple=${coupleId}` : "/couples", matchPath: "/past-days", label: "Past Days", icon: "history" as const },
     { href: "/settings", matchPath: "/settings", label: "Settings", icon: "settings" as const },
   ];
 
