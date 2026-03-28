@@ -23,6 +23,12 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  const { data: currentUserProfile } = await supabase
+    .from("users")
+    .select("display_name")
+    .eq("id", user.id)
+    .single();
+
   // Use service client for partner lookups (RLS on users table
   // only allows reading partners via the single couple_id field,
   // which breaks in a multi-couple scenario)
@@ -111,7 +117,10 @@ export async function GET() {
   });
 
   return NextResponse.json(
-    { couples: couplesWithDetails },
+    {
+      couples: couplesWithDetails,
+      currentUserDisplayName: currentUserProfile?.display_name || "",
+    },
     { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } }
   );
 }
