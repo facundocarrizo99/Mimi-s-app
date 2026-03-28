@@ -56,11 +56,62 @@ export default function PastDaysPage() {
         .single();
       setCouple(coupleDetail);
 
-      // Fetch paginated dates for calendar view.
+      // Fetch first page for fast initial render, then stream remaining pages.
       const aggregatedDates: PastDate[] = [];
       let page = 1;
-      let hasMore = true;
       const maxPages = 24;
+
+      let firstResponse: Response;
+      try {
+        firstResponse = await fetch(`/api/past-days?couple_id=${coupleId}&page=${page}`, {
+          cache: "no-store",
+        });
+      } catch (error) {
+        console.error("Failed to fetch past-days page", { page, error });
+        setDates([]);
+        setSelectedMonth(getCurrentMonth());
+        setLoading(false);
+        return;
+      }
+
+      if (!firstResponse.ok) {
+        console.error("Past-days API request failed", {
+          page,
+          status: firstResponse.status,
+          statusText: firstResponse.statusText,
+        });
+        setDates([]);
+        setSelectedMonth(getCurrentMonth());
+        setLoading(false);
+        return;
+      }
+
+      const firstPageData = (await firstResponse.json().catch(() => ({}))) as {
+        dates?: PastDate[];
+        hasMore?: boolean;
+      };
+
+      if (!Array.isArray(firstPageData.dates)) {
+        setDates([]);
+        setSelectedMonth(getCurrentMonth());
+        setLoading(false);
+        return;
+      }
+
+      aggregatedDates.push(...firstPageData.dates);
+      setDates([...aggregatedDates]);
+
+      const latestPastDate = aggregatedDates.find((d) => !d.isToday);
+      if (latestPastDate) {
+        setSelectedMonth(getMonthKey(latestPastDate) || getCurrentMonth());
+      } else {
+        setSelectedMonth(getCurrentMonth());
+      }
+
+      setLoading(false);
+
+      let hasMore = Boolean(firstPageData.hasMore) && firstPageData.dates.length > 0;
+      page += 1;
 
       while (hasMore && page <= maxPages) {
         let res: Response;
@@ -87,30 +138,21 @@ export default function PastDaysPage() {
           hasMore?: boolean;
         };
 
-        if (!Array.isArray(data.dates)) {
+        if (!Array.isArray(data.dates) || data.dates.length === 0) {
           break;
         }
 
         aggregatedDates.push(...data.dates);
-        hasMore = Boolean(data.hasMore) && data.dates.length > 0;
+        setDates([...aggregatedDates]);
+        hasMore = Boolean(data.hasMore);
         page += 1;
-      }
-
-      setDates(aggregatedDates);
-
-      const latestPastDate = aggregatedDates.find((d) => !d.isToday);
-      if (latestPastDate) {
-        setSelectedMonth(getMonthKey(latestPastDate) || getCurrentMonth());
-      } else {
-        setSelectedMonth(getCurrentMonth());
       }
     } catch (error) {
       console.error("Failed to load past-days data", error);
       setDates([]);
       setSelectedMonth(getCurrentMonth());
-    } finally {
-      setLoading(false);
     }
+    setLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [coupleId]);
 
