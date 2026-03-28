@@ -145,7 +145,13 @@ async function getPastDatesList(
   }
 
   // Build the date list
+  const todayKey = normalizeDateKey(today);
+
   const dates = paginatedDates.map((date) => {
+    const dateKey = normalizeDateKey(date);
+    const [yearPart, monthPart, dayPart] = dateKey.split("-");
+    const monthKey = `${yearPart}-${monthPart}`;
+    const dayOfMonth = Number(dayPart);
     const questionIds = dateMap[date];
     const totalQuestions = questionIds.length;
     const myAnswerCount = questionIds.filter((id) =>
@@ -157,10 +163,13 @@ async function getPastDatesList(
 
     return {
       date,
+      date_key: dateKey,
+      month_key: monthKey,
+      day_of_month: Number.isFinite(dayOfMonth) ? dayOfMonth : null,
       totalQuestions,
       myAnswerCount,
       partnerAnswerCount,
-      isToday: date === today,
+      isToday: dateKey === todayKey,
       isComplete: myAnswerCount === totalQuestions,
     };
   });
@@ -229,4 +238,27 @@ function getDateInTimezone(timezone: string): string {
     day: "2-digit",
   });
   return formatter.format(now);
+}
+
+function normalizeDateKey(value: string): string {
+  const trimmed = String(value).trim();
+
+  const isoDate = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoDate) {
+    return `${isoDate[1]}-${isoDate[2]}-${isoDate[3]}`;
+  }
+
+  const slashDate = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (slashDate) {
+    return `${slashDate[3]}-${String(Number(slashDate[1])).padStart(2, "0")}-${String(
+      Number(slashDate[2])
+    ).padStart(2, "0")}`;
+  }
+
+  const parsed = new Date(trimmed);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed.toISOString().slice(0, 10);
+  }
+
+  return trimmed;
 }

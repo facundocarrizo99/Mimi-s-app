@@ -1,16 +1,18 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import { AppShell } from "@/components/layout/AppShell";
 import { Loading } from "@/components/ui/Loading";
-import { formatDate } from "@/lib/utils";
 import type { Couple } from "@/types/database";
 
 interface PastDate {
   date: string;
+  date_key?: string;
+  month_key?: string;
+  day_of_month?: number | null;
   totalQuestions: number;
   myAnswerCount: number;
   partnerAnswerCount: number;
@@ -22,6 +24,7 @@ export default function PastDaysPage() {
   const [dates, setDates] = useState<PastDate[]>([]);
   const [loading, setLoading] = useState(true);
   const [couple, setCouple] = useState<Couple | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState("");
 
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -31,36 +34,83 @@ export default function PastDaysPage() {
   const loadData = useCallback(async () => {
     setLoading(true);
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      router.push("/auth/login");
-      return;
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        router.push("/auth/login");
+        return;
+      }
+
+      if (!coupleId) {
+        router.push("/couples");
+        return;
+      }
+
+      // Couple info for streak
+      const { data: coupleDetail } = await supabase
+        .from("couples")
+        .select("*")
+        .eq("id", coupleId)
+        .single();
+      setCouple(coupleDetail);
+
+      // Fetch paginated dates for calendar view.
+      const aggregatedDates: PastDate[] = [];
+      let page = 1;
+      let hasMore = true;
+      const maxPages = 24;
+
+      while (hasMore && page <= maxPages) {
+        let res: Response;
+        try {
+          res = await fetch(`/api/past-days?couple_id=${coupleId}&page=${page}`, {
+            cache: "no-store",
+          });
+        } catch (error) {
+          console.error("Failed to fetch past-days page", { page, error });
+          break;
+        }
+
+        if (!res.ok) {
+          console.error("Past-days API request failed", {
+            page,
+            status: res.status,
+            statusText: res.statusText,
+          });
+          break;
+        }
+
+        const data = (await res.json().catch(() => ({}))) as {
+          dates?: PastDate[];
+          hasMore?: boolean;
+        };
+
+        if (!Array.isArray(data.dates)) {
+          break;
+        }
+
+        aggregatedDates.push(...data.dates);
+        hasMore = Boolean(data.hasMore) && data.dates.length > 0;
+        page += 1;
+      }
+
+      setDates(aggregatedDates);
+
+      const latestPastDate = aggregatedDates.find((d) => !d.isToday);
+      if (latestPastDate) {
+        setSelectedMonth(getMonthKey(latestPastDate) || getCurrentMonth());
+      } else {
+        setSelectedMonth(getCurrentMonth());
+      }
+    } catch (error) {
+      console.error("Failed to load past-days data", error);
+      setDates([]);
+      setSelectedMonth(getCurrentMonth());
+    } finally {
+      setLoading(false);
     }
-
-    if (!coupleId) {
-      router.push("/couples");
-      return;
-    }
-
-    // Couple info for streak
-    const { data: coupleDetail } = await supabase
-      .from("couples")
-      .select("*")
-      .eq("id", coupleId)
-      .single();
-    setCouple(coupleDetail);
-
-    // Fetch past dates
-    const res = await fetch(`/api/past-days?couple_id=${coupleId}`);
-    const data = await res.json();
-
-    if (data.dates) {
-      setDates(data.dates);
-    }
-
-    setLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [coupleId]);
 
@@ -68,11 +118,85 @@ export default function PastDaysPage() {
     loadData();
   }, [loadData]);
 
-  if (loading) return <Loading />;
-
   const pastDates = dates.filter((d) => !d.isToday);
-  const unansweredDates = pastDates.filter((d) => !d.isComplete);
-  const completedDates = pastDates.filter((d) => d.isComplete);
+
+  const availableMonths = useMemo(() => {
+    const monthSet = new Set<string>();
+    for (const d of pastDates) {
+      const monthKey = getMonthKey(d);
+      if (monthKey) {
+        monthSet.add(monthKey.trim());
+      }
+    }
+    const months = Array.from(monthSet).sort((a, b) => b.localeCompare(a));
+    return months.length > 0 ? months : [getCurrentMonth()];
+  }, [pastDates]);
+
+  const effectiveMonth = (selectedMonth || availableMonths[0] || getCurrentMonth()).trim();
+
+  const selectedMonthData = pastDates.filter((d) => getMonthKey(d) === effectiveMonth);
+
+  const dayMap = useMemo(() => {
+    const map = new Map<number, PastDate>();
+    for (const d of selectedMonthData) {
+      if (typeof d.day_of_month === "number" && d.day_of_month >= 1 && d.day_of_month <= 31) {
+        map.set(d.day_of_month, d);
+        continue;
+      }
+
+      const dateKey = getDateKey(d);
+      if (!dateKey) continue;
+      const parts = dateKey.split("-");
+      const dayNumber = Number(parts[2]);
+      if (Number.isFinite(dayNumber) && dayNumber >= 1 && dayNumber <= 31) {
+        map.set(dayNumber, d);
+      }
+    }
+    return map;
+  }, [selectedMonthData]);
+
+  const calendarDays = useMemo(() => {
+    const parsedMonth = parseMonthKey(effectiveMonth);
+    const year = parsedMonth.year;
+    const month = parsedMonth.month;
+
+    const firstDay = new Date(year, month - 1, 1);
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const startOffset = firstDay.getDay();
+    const today = getTodayISO();
+
+    const cells: Array<{ date: string; day: number; entry?: PastDate; isFuture: boolean }> = [];
+
+    for (let i = 0; i < startOffset; i += 1) {
+      cells.push({ date: `pad-${i}`, day: 0, isFuture: false });
+    }
+
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      const date = `${effectiveMonth}-${String(day).padStart(2, "0")}`;
+      const entry = dayMap.get(day);
+      cells.push({
+        date,
+        day,
+        entry,
+        isFuture: date > today,
+      });
+    }
+
+    return cells;
+  }, [dayMap, effectiveMonth]);
+  const selectedMonthAnswered = selectedMonthData.reduce(
+    (acc, d) => acc + d.myAnswerCount,
+    0
+  );
+  const selectedMonthTotal = selectedMonthData.reduce(
+    (acc, d) => acc + d.totalQuestions,
+    0
+  );
+  const bothCompletedDays = selectedMonthData.filter(
+    (d) => d.partnerAnswerCount === d.totalQuestions && d.myAnswerCount === d.totalQuestions
+  ).length;
+
+  if (loading) return <Loading />;
 
   return (
     <AppShell
@@ -90,125 +214,151 @@ export default function PastDaysPage() {
             Past Days
           </h2>
           <p className="text-sm text-textsecondary">
-            Revisit your questions and fill in what you missed.
+            Calendar view of your daily progress together.
           </p>
         </motion.div>
 
-        {/* Unanswered section */}
-        {unansweredDates.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4 }}
-            className="space-y-3"
-          >
-            <h3 className="text-sm font-medium text-[var(--status-error)] flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-[var(--status-error)]/70 animate-pulse" />
-              Waiting for your words
-            </h3>
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35 }}
+          className="md3-surface p-4"
+        >
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <div>
+              <p className="text-sm text-textsecondary">Selected month</p>
+              <p className="text-lg font-semibold text-textprimary">
+                {formatMonthName(effectiveMonth)}
+              </p>
+            </div>
+            <select
+              value={effectiveMonth}
+              onChange={(e) => setSelectedMonth(e.target.value.trim())}
+              className="px-3 py-2 rounded-xl bg-[var(--md-sys-color-surface-container-high)] border border-[var(--md-sys-color-outline-variant)] text-sm text-textprimary focus:outline-none focus:ring-2 focus:ring-[var(--md-sys-color-primary)]/30"
+            >
+              {availableMonths.map((month) => (
+                <option key={month} value={month}>
+                  {formatMonthName(month)}
+                </option>
+              ))}
+            </select>
+          </div>
 
-            {unansweredDates.map((d, i) => (
-              <motion.button
-                key={d.date}
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: i * 0.05 }}
-                onClick={() =>
-                  router.push(
-                    `/past-days/${d.date}?couple=${coupleId}`
-                  )
-                }
-                className="w-full text-left md3-surface p-5 hover:brightness-[1.02] transition-all duration-200 group border-[var(--md-sys-color-primary)]/25"
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-lg font-medium text-textprimary group-hover:text-[var(--md-sys-color-primary)] transition-colors">
-                      {formatDate(d.date)}
-                    </p>
-                    <p className="text-xs text-textsecondary mt-1">
-                      {d.myAnswerCount} of {d.totalQuestions} answered
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {/* Progress indicator */}
-                    <div className="flex gap-1">
-                      {Array.from({ length: d.totalQuestions }).map((_, qi) => (
-                        <div
-                          key={qi}
-                          className={`w-1.5 h-1.5 rounded-full ${
-                            qi < d.myAnswerCount
-                              ? "bg-[var(--md-sys-color-primary)]"
-                              : "bg-[var(--md-sys-color-outline-variant)]/50"
-                          }`}
-                        />
-                      ))}
-                    </div>
-                    <span className="text-textsecondary group-hover:text-[var(--md-sys-color-primary)] transition-colors text-sm">
-                      &rarr;
-                    </span>
-                  </div>
-                </div>
-              </motion.button>
+          <div className="grid grid-cols-3 gap-2 mb-4">
+            <div className="rounded-2xl bg-[var(--md-sys-color-primary-container)] p-3 text-center">
+              <p className="text-xs text-textsecondary">Your answers</p>
+              <p className="text-base font-semibold text-textprimary">
+                {selectedMonthAnswered}/{selectedMonthTotal}
+              </p>
+            </div>
+            <div className="rounded-2xl bg-[var(--md-sys-color-secondary-container)] p-3 text-center">
+              <p className="text-xs text-textsecondary">Both complete</p>
+              <p className="text-base font-semibold text-textprimary">
+                {bothCompletedDays}
+              </p>
+            </div>
+            <div className="rounded-2xl bg-[var(--md-sys-color-tertiary-container)] p-3 text-center">
+              <p className="text-xs text-textsecondary">Tracked days</p>
+              <p className="text-base font-semibold text-textprimary">
+                {selectedMonthData.length}
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-7 gap-1 mb-2">
+            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+              <div key={day} className="text-[11px] text-textmuted text-center py-1">
+                {day}
+              </div>
             ))}
-          </motion.div>
-        )}
+          </div>
 
-        {/* Completed section */}
-        {completedDates.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.1 }}
-            className="space-y-3"
-          >
-            <h3 className="text-sm font-medium text-textsecondary flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-[var(--status-success)]" />
-              Completed
-            </h3>
+          <div className="grid grid-cols-7 gap-1.5">
+            {calendarDays.map((cell, idx) => {
+              if (cell.day === 0) {
+                return <div key={cell.date} className="h-20" aria-hidden />;
+              }
 
-            {completedDates.map((d, i) => (
-              <motion.button
-                key={d.date}
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: i * 0.04 }}
-                onClick={() =>
-                  router.push(
-                    `/past-days/${d.date}?couple=${coupleId}`
-                  )
-                }
-                className="w-full text-left md3-surface p-5 hover:brightness-[1.02] transition-all duration-200 group"
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-lg font-medium text-textprimary">
-                      {formatDate(d.date)}
-                    </p>
-                    <p className="text-xs text-textmuted mt-1">
-                      All {d.totalQuestions} answered
-                      {d.partnerAnswerCount === d.totalQuestions
-                        ? " — both of you"
-                        : ""}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="flex gap-1">
-                      {Array.from({ length: d.totalQuestions }).map((_, qi) => (
-                        <div
-                          key={qi}
-                          className="w-1.5 h-1.5 rounded-full bg-[var(--status-success)]/70"
-                        />
-                      ))}
+              const entry = cell.entry;
+              const hasData = Boolean(entry);
+              const isBothComplete =
+                hasData &&
+                (entry?.partnerAnswerCount ?? 0) === (entry?.totalQuestions ?? -1) &&
+                (entry?.myAnswerCount ?? 0) === (entry?.totalQuestions ?? -1);
+              const isMineComplete =
+                hasData && (entry?.myAnswerCount ?? 0) === (entry?.totalQuestions ?? -1);
+
+              return (
+                <motion.button
+                  key={cell.date}
+                  initial={{ opacity: 0, scale: 0.96 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.2, delay: Math.min(idx * 0.01, 0.2) }}
+                  onClick={() => {
+                    if (!hasData || cell.isFuture) return;
+                    router.push(`/past-days/${cell.date}?couple=${coupleId}`);
+                  }}
+                  disabled={!hasData || cell.isFuture}
+                  className={`h-20 rounded-2xl border p-1.5 text-left transition-all ${
+                    !hasData || cell.isFuture
+                      ? "bg-[var(--md-sys-color-surface-container-low)] border-[var(--md-sys-color-outline-variant)]/35 opacity-55"
+                      : isBothComplete
+                      ? "bg-[var(--md-sys-color-tertiary-container)] border-[var(--status-success)]/40 hover:brightness-105"
+                      : isMineComplete
+                      ? "bg-[var(--md-sys-color-secondary-container)] border-[var(--md-sys-color-secondary)]/30 hover:brightness-105"
+                      : "bg-[var(--md-sys-color-primary-container)] border-[var(--md-sys-color-primary)]/30 hover:brightness-105"
+                  }`}
+                >
+                  <div className="flex h-full flex-col">
+                    <div className="flex items-start justify-between">
+                      <span className="text-[11px] font-semibold leading-none text-textprimary">
+                        {cell.day}
+                      </span>
                     </div>
-                    <span className="text-textmuted group-hover:text-textsecondary transition-colors text-sm">
-                      &rarr;
-                    </span>
+
+                    <div className="flex-1 grid place-items-center">
+                      <span className="text-[13px] font-medium leading-none text-textsecondary">
+                        {hasData
+                          ? `${entry?.myAnswerCount ?? 0}/${entry?.totalQuestions ?? 0}`
+                          : "--/--"}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-center">
+                      <span
+                        className={`w-2.5 h-2.5 rounded-full ${
+                          !hasData
+                            ? "bg-[var(--md-sys-color-outline-variant)]/60"
+                            : isBothComplete
+                            ? "bg-[var(--status-success)]"
+                            : isMineComplete
+                            ? "bg-[var(--md-sys-color-secondary)]"
+                            : "bg-[var(--md-sys-color-primary)]"
+                        }`}
+                        aria-hidden
+                      />
+                    </div>
                   </div>
-                </div>
-              </motion.button>
-            ))}
-          </motion.div>
-        )}
+                </motion.button>
+              );
+            })}
+          </div>
+
+          <div className="flex items-center justify-center flex-wrap gap-4 mt-4 text-[11px] text-textsecondary">
+            <span className="inline-flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-[var(--status-success)]" />
+              Both finished
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-[var(--md-sys-color-secondary)]" />
+              You finished
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-[var(--md-sys-color-primary)]" />
+              Pending
+            </span>
+          </div>
+        </motion.div>
 
         {/* Empty state */}
         {pastDates.length === 0 && (
@@ -218,9 +368,9 @@ export default function PastDaysPage() {
             className="text-center py-12"
           >
             <p className="text-3xl mb-3">&#128220;</p>
-              <p className="text-lg font-medium text-textprimary mb-1">
-                No past days yet
-              </p>
+            <p className="text-lg font-medium text-textprimary mb-1">
+              No past days yet
+            </p>
             <p className="text-sm text-textsecondary">
               Come back tomorrow to see today&apos;s questions here.
             </p>
@@ -244,4 +394,87 @@ export default function PastDaysPage() {
       </div>
     </AppShell>
   );
+}
+
+function getCurrentMonth() {
+  return getTodayISO().slice(0, 7);
+}
+
+function getMonthKey(value: PastDate) {
+  if (value.month_key) {
+    return value.month_key.trim();
+  }
+
+  const source = String(value.date).trim();
+  const isoMonth = source.match(/^(\d{4})-(\d{2})/);
+  if (isoMonth) {
+    return `${isoMonth[1]}-${isoMonth[2]}`;
+  }
+
+  const slashDate = source.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (slashDate) {
+    return `${slashDate[3]}-${String(Number(slashDate[1])).padStart(2, "0")}`;
+  }
+
+  const parsed = new Date(source);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed.toISOString().slice(0, 7);
+  }
+
+  return null;
+}
+
+function getDateKey(value: PastDate) {
+  if (value.date_key) {
+    return value.date_key.trim();
+  }
+
+  const source = String(value.date).trim();
+  const isoDate = source.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoDate) {
+    return `${isoDate[1]}-${isoDate[2]}-${isoDate[3]}`;
+  }
+
+  const slashDate = source.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (slashDate) {
+    return `${slashDate[3]}-${String(Number(slashDate[1])).padStart(2, "0")}-${String(
+      Number(slashDate[2])
+    ).padStart(2, "0")}`;
+  }
+
+  const parsed = new Date(source);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed.toISOString().slice(0, 10);
+  }
+
+  return null;
+}
+
+function getTodayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function formatMonthName(month: string) {
+  const parsedMonth = parseMonthKey(month);
+  const date = new Date(parsedMonth.year, parsedMonth.month - 1, 1);
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    year: "numeric",
+  }).format(date);
+}
+
+function parseMonthKey(value: string) {
+  const clean = String(value).trim();
+  const iso = clean.match(/^(\d{4})-(\d{2})$/);
+  if (iso) {
+    return { year: Number(iso[1]), month: Number(iso[2]) };
+  }
+
+  const parsed = new Date(clean);
+  if (!Number.isNaN(parsed.getTime())) {
+    return { year: parsed.getFullYear(), month: parsed.getMonth() + 1 };
+  }
+
+  const fallback = getCurrentMonth().split("-");
+  return { year: Number(fallback[0]), month: Number(fallback[1]) };
 }
