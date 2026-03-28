@@ -44,9 +44,9 @@ export default function MonthlySummaryPage() {
   const router = useRouter();
   const coupleId = searchParams.get("couple");
   const monthParam = searchParams.get("month");
-  const supabase = createClient();
 
   const loadData = useCallback(async () => {
+    const supabase = createClient();
     setLoading(true);
 
     const {
@@ -96,7 +96,7 @@ export default function MonthlySummaryPage() {
     }
 
     setLoading(false);
-  }, [coupleId, monthParam, router, supabase]);
+  }, [coupleId, monthParam, router]);
 
   useEffect(() => {
     loadData();

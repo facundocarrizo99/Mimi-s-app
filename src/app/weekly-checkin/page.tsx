@@ -30,9 +30,9 @@ export default function WeeklyCheckinPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const coupleId = searchParams.get("couple");
-  const supabase = createClient();
 
   const loadData = useCallback(async () => {
+    const supabase = createClient();
     setLoading(true);
 
     const {
@@ -77,7 +77,7 @@ export default function WeeklyCheckinPage() {
     }
 
     setLoading(false);
-  }, [coupleId, router, supabase]);
+  }, [coupleId, router]);
 
   useEffect(() => {
     loadData();

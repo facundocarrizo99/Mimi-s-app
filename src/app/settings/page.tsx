@@ -51,9 +51,8 @@ export default function SettingsPage() {
   const [passkeyMessage, setPasskeyMessage] = useState("");
   const [passkeyError, setPasskeyError] = useState("");
 
-  const supabase = createClient();
-
   const loadData = useCallback(async () => {
+    const supabase = createClient();
     const res = await fetch("/api/couple");
     const data = await res.json();
 
@@ -81,7 +80,7 @@ export default function SettingsPage() {
     setPasskeys((factorData?.all || []).filter((f) => f.factor_type === "webauthn"));
 
     setLoading(false);
-  }, [supabase]);
+  }, []);
 
   useEffect(() => {
     loadData();
@@ -89,6 +88,7 @@ export default function SettingsPage() {
 
   async function handleSave() {
     if (!profile) return;
+    const supabase = createClient();
     setSaving(true);
 
     await supabase
@@ -112,16 +112,19 @@ export default function SettingsPage() {
   }
 
   async function handleSignOut() {
+    const supabase = createClient();
     await supabase.auth.signOut();
     window.location.href = "/auth/login";
   }
 
   async function refreshPasskeys() {
+    const supabase = createClient();
     const { data: factorData } = await supabase.auth.mfa.listFactors();
     setPasskeys((factorData?.all || []).filter((f) => f.factor_type === "webauthn"));
   }
 
   async function handleCreatePasskey() {
+    const supabase = createClient();
     setPasskeyBusy(true);
     setPasskeyError("");
     setPasskeyMessage("");
@@ -149,6 +152,7 @@ export default function SettingsPage() {
   }
 
   async function handleVerifyPasskey() {
+    const supabase = createClient();
     setPasskeyBusy(true);
     setPasskeyError("");
     setPasskeyMessage("");
@@ -175,6 +179,7 @@ export default function SettingsPage() {
   }
 
   async function handleDeletePasskey(factorId: string) {
+    const supabase = createClient();
     setPasskeyBusy(true);
     setPasskeyError("");
     setPasskeyMessage("");

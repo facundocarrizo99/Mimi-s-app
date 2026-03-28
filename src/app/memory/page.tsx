@@ -30,10 +30,9 @@ export default function MemoryPage() {
   const [currentUserId, setCurrentUserId] = useState("");
   const [onThisDay, setOnThisDay] = useState<MemoryEntry[]>([]);
 
-  const supabase = createClient();
-
   const loadMemories = useCallback(
     async (filterVal: FilterType = "all", searchVal: string = "") => {
+      const supabase = createClient();
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -66,7 +65,7 @@ export default function MemoryPage() {
       setOnThisDay(data.onThisDay || []);
       setLoading(false);
     },
-    [supabase]
+    []
   );
 
   useEffect(() => {

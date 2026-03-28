@@ -8,10 +8,10 @@ import { createClient } from "@/lib/supabase/client";
 export default function Home() {
   const [checking, setChecking] = useState(true);
   const router = useRouter();
-  const supabase = createClient();
 
   useEffect(() => {
     async function check() {
+      const supabase = createClient();
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -34,7 +34,7 @@ export default function Home() {
       }
     }
     check();
-  }, [supabase, router]);
+  }, [router]);
 
   if (checking) {
     return (
