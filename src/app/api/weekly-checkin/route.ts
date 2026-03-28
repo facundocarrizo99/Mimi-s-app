@@ -72,20 +72,16 @@ export async function GET(request: NextRequest) {
   // Calculate the start of the current week (Sunday)
   const weekStartDate = normalizeDateToISO(getWeekStartDate(timezone));
 
-  // Check if weekly check-in exists for this week
-  const { data: existingCheckin } = await supabase
+  // Check if weekly check-in exists for this week, including answers
+  const { data: existingCheckinWithAnswers } = await supabase
     .from("weekly_checkins")
-    .select("*")
+    .select("*, answers:weekly_checkin_answers(*)")
     .eq("couple_id", couple_id)
     .eq("week_start_date", weekStartDate)
-    .single();
+    .maybeSingle();
 
-  if (existingCheckin) {
-    // Load answers using authenticated client (RLS handles authorization)
-    const { data: answers } = await supabase
-      .from("weekly_checkin_answers")
-      .select("*")
-      .eq("checkin_id", existingCheckin.id);
+  if (existingCheckinWithAnswers) {
+    const { answers, ...existingCheckin } = existingCheckinWithAnswers;
 
     return NextResponse.json(
       { 

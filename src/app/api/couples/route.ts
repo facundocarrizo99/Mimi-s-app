@@ -23,12 +23,6 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const { data: currentUserProfile } = await supabase
-    .from("users")
-    .select("display_name")
-    .eq("id", user.id)
-    .single();
-
   // Use service client for partner lookups (RLS on users table
   // only allows reading partners via the single couple_id field,
   // which breaks in a multi-couple scenario)
@@ -64,7 +58,7 @@ export async function GET() {
   const coupleIds = couplesList.map((couple) => couple.id);
   let dailyQuestions: { id: string; couple_id: string; question_date: string }[] = [];
   if (coupleIds.length > 0 && uniqueDates.size > 0) {
-    const { data } = await supabase
+    const { data } = await serviceClient
       .from("daily_questions")
       .select("id, couple_id, question_date")
       .in("couple_id", coupleIds)
@@ -86,7 +80,7 @@ export async function GET() {
   const answeredQuestionIds = new Set<string>();
 
   if (allQuestionIds.length > 0) {
-    const { data: myAnswers } = await supabase
+    const { data: myAnswers } = await serviceClient
       .from("answers")
       .select("daily_question_id")
       .eq("user_id", user.id)
@@ -119,7 +113,8 @@ export async function GET() {
   return NextResponse.json(
     {
       couples: couplesWithDetails,
-      currentUserDisplayName: currentUserProfile?.display_name || "",
+      currentUserDisplayName:
+        user.user_metadata?.display_name || user.email?.split("@")[0] || "",
     },
     { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } }
   );

@@ -62,39 +62,28 @@ export async function GET(request: NextRequest) {
   // Check if daily questions already exist for today
   const { data: existing } = await supabase
     .from("daily_questions")
-    .select("*, question:questions(*)")
+    .select("*, question:questions(*), answers(*)")
     .eq("couple_id", couple_id)
     .eq("question_date", today)
     .order("position");
 
   if (existing && existing.length === 7) {
-    // Load answers for these questions
-    // Use service client to bypass RLS — we already verified couple membership above
+    // Load favorites for these questions using service client.
+    // Answers are already included in the query above.
     const serviceClient = await createServiceClient();
     const questionIds = existing.map((dq) => dq.id);
-    
-    const [answersResult, favoritesResult] = await Promise.all([
-      serviceClient
-        .from("answers")
-        .select("*")
-        .in("daily_question_id", questionIds),
-      serviceClient
-        .from("favorites")
-        .select("*")
-        .in("daily_question_id", questionIds)
-        .eq("user_id", user.id),
-    ]);
 
-    const answers = answersResult.data || [];
-    const favorites = favoritesResult.data || [];
+    const { data: favorites } = await serviceClient
+      .from("favorites")
+      .select("*")
+      .in("daily_question_id", questionIds)
+      .eq("user_id", user.id);
 
     const withDetails = existing.map((dq) => ({
       ...dq,
-      answers: answers.filter((a) => a.daily_question_id === dq.id),
-      favorites: favorites.filter((f) => f.daily_question_id === dq.id),
+      answers: dq.answers || [],
+      favorites: (favorites || []).filter((f) => f.daily_question_id === dq.id),
     }));
-
-    console.log("[daily-questions] answers attached:", withDetails.reduce((sum, q) => sum + q.answers.length, 0));
 
     return NextResponse.json(
       {
