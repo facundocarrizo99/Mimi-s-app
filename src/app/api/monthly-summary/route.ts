@@ -22,11 +22,15 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const { data: profile } = await supabase
-    .from("users")
-    .select("couple_id")
-    .eq("id", user.id)
-    .single();
+  let profile: { couple_id: string | null } | null = null;
+  if (!coupleIdParam) {
+    const { data } = await supabase
+      .from("users")
+      .select("couple_id")
+      .eq("id", user.id)
+      .single();
+    profile = data;
+  }
 
   const couple_id = coupleIdParam || profile?.couple_id;
 
