@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
   // Verify user belongs to this couple
   const { data: coupleCheck } = await supabase
     .from("couples")
-    .select("id, timezone, streak_count")
+    .select("id, timezone, streak_count, user_1_id, user_2_id")
     .eq("id", couple_id)
     .or(`user_1_id.eq.${user.id},user_2_id.eq.${user.id}`)
     .single();
@@ -213,9 +213,30 @@ async function getQuestionsForDate(
   coupleId: string,
   date: string,
   userId: string,
-  couple: { id: string; timezone: string | null; streak_count: number | null }
+  couple: {
+    id: string;
+    timezone: string | null;
+    streak_count: number | null;
+    user_1_id: string;
+    user_2_id: string | null;
+  }
 ) {
   const serviceClient = await createServiceClient();
+
+  const partnerId =
+    couple.user_1_id === userId ? couple.user_2_id : couple.user_1_id;
+  let partnerName = "";
+  if (partnerId) {
+    const { data: partnerProfile } = await serviceClient
+      .from("users")
+      .select("display_name, email")
+      .eq("id", partnerId)
+      .maybeSingle();
+    partnerName =
+      partnerProfile?.display_name ||
+      partnerProfile?.email ||
+      "";
+  }
 
   // Use service client for everything — consistent, bypasses RLS
   const { data: questions } = await serviceClient
@@ -226,7 +247,13 @@ async function getQuestionsForDate(
     .order("position");
 
   if (!questions || questions.length === 0) {
-    return jsonResponse({ questions: [], date, couple });
+    return jsonResponse({
+      questions: [],
+      date,
+      couple,
+      currentUserId: userId,
+      partnerName,
+    });
   }
 
   const questionIds = questions.map((dq) => dq.id);
@@ -253,7 +280,13 @@ async function getQuestionsForDate(
     favorites: favorites.filter((f) => f.daily_question_id === dq.id),
   }));
 
-  return jsonResponse({ questions: withDetails, date, couple });
+  return jsonResponse({
+    questions: withDetails,
+    date,
+    couple,
+    currentUserId: userId,
+    partnerName,
+  });
 }
 
 function jsonResponse(data: Record<string, unknown>) {
