@@ -28,56 +28,87 @@ export async function GET() {
   // which breaks in a multi-couple scenario)
   const serviceClient = await createServiceClient();
 
-  // For each couple, get partner info and today's progress
-  const couplesWithDetails = await Promise.all(
-    (couples || []).map(async (couple) => {
-      const partnerId =
-        couple.user_1_id === user.id ? couple.user_2_id : couple.user_1_id;
-      let partner = null;
+  const couplesList = couples || [];
+  const partnerIds = couplesList
+    .map((couple) =>
+      couple.user_1_id === user.id ? couple.user_2_id : couple.user_1_id
+    )
+    .filter((partnerId): partnerId is string => Boolean(partnerId));
 
-      if (partnerId) {
-        const { data: partnerData } = await serviceClient
-          .from("users")
-          .select("id, display_name, email")
-          .eq("id", partnerId)
-          .single();
-        partner = partnerData;
-      }
+  const partnersById = new Map<string, { id: string; display_name: string; email: string }>();
+  if (partnerIds.length > 0) {
+    const { data: partners } = await serviceClient
+      .from("users")
+      .select("id, display_name, email")
+      .in("id", partnerIds);
 
-      // Get today's progress for this couple
-      const timezone = couple.timezone || "America/New_York";
-      const today = getDateInTimezone(timezone);
+    for (const partner of partners || []) {
+      partnersById.set(partner.id, partner);
+    }
+  }
 
-      const { data: todayQuestions } = await supabase
-        .from("daily_questions")
-        .select("id")
-        .eq("couple_id", couple.id)
-        .eq("question_date", today);
+  const todayByCoupleId = new Map<string, string>();
+  const uniqueDates = new Set<string>();
+  for (const couple of couplesList) {
+    const today = getDateInTimezone(couple.timezone || "America/New_York");
+    todayByCoupleId.set(couple.id, today);
+    uniqueDates.add(today);
+  }
 
-      let answeredCount = 0;
-      const totalQuestions = todayQuestions?.length || 0;
+  const coupleIds = couplesList.map((couple) => couple.id);
+  let dailyQuestions: { id: string; couple_id: string; question_date: string }[] = [];
+  if (coupleIds.length > 0 && uniqueDates.size > 0) {
+    const { data } = await supabase
+      .from("daily_questions")
+      .select("id, couple_id, question_date")
+      .in("couple_id", coupleIds)
+      .in("question_date", Array.from(uniqueDates));
+    dailyQuestions = data || [];
+  }
 
-      if (todayQuestions && todayQuestions.length > 0) {
-        const questionIds = todayQuestions.map((q) => q.id);
-        const { data: myAnswers } = await supabase
-          .from("answers")
-          .select("id")
-          .in("daily_question_id", questionIds)
-          .eq("user_id", user.id);
-        answeredCount = myAnswers?.length || 0;
-      }
+  const questionIdsByCoupleId = new Map<string, string[]>();
+  for (const question of dailyQuestions) {
+    const expectedDate = todayByCoupleId.get(question.couple_id);
+    if (!expectedDate || expectedDate !== question.question_date) continue;
 
-      return {
-        ...couple,
-        partner,
-        today_progress: {
-          answered: answeredCount,
-          total: totalQuestions,
-          date: today,
-        },
-      };
-    })
-  );
+    const existing = questionIdsByCoupleId.get(question.couple_id) || [];
+    existing.push(question.id);
+    questionIdsByCoupleId.set(question.couple_id, existing);
+  }
+
+  const allQuestionIds = Array.from(questionIdsByCoupleId.values()).flat();
+  const answeredQuestionIds = new Set<string>();
+
+  if (allQuestionIds.length > 0) {
+    const { data: myAnswers } = await supabase
+      .from("answers")
+      .select("daily_question_id")
+      .eq("user_id", user.id)
+      .in("daily_question_id", allQuestionIds);
+
+    for (const answer of myAnswers || []) {
+      answeredQuestionIds.add(answer.daily_question_id);
+    }
+  }
+
+  const couplesWithDetails = couplesList.map((couple) => {
+    const partnerId =
+      couple.user_1_id === user.id ? couple.user_2_id : couple.user_1_id;
+
+    const questionIds = questionIdsByCoupleId.get(couple.id) || [];
+    const answeredCount = questionIds.filter((id) => answeredQuestionIds.has(id)).length;
+    const today = todayByCoupleId.get(couple.id) || getDateInTimezone(couple.timezone || "America/New_York");
+
+    return {
+      ...couple,
+      partner: partnerId ? partnersById.get(partnerId) || null : null,
+      today_progress: {
+        answered: answeredCount,
+        total: questionIds.length,
+        date: today,
+      },
+    };
+  });
 
   return NextResponse.json(
     { couples: couplesWithDetails },
