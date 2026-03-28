@@ -174,35 +174,38 @@ export default function WeeklyCheckinPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
         >
-          <Card>
-            <div className="p-6 space-y-6">
-              {/* Question */}
-              <div className="space-y-3">
-                <div className="flex items-start gap-3">
-                  <span className="text-3xl flex-shrink-0">💭</span>
-                  <p className="text-xl font-serif text-textprimary leading-relaxed">
-                    {checkin.question_text}
-                  </p>
-                </div>
+          <Card className="relative">
+            <div className="space-y-5">
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-xs px-2.5 py-1 rounded-full font-medium bg-[var(--md-sys-color-tertiary-container)] text-textprimary">
+                  Weekly Reflection
+                </span>
+                <span className="text-textmuted text-xs">1/1</span>
               </div>
+
+              <p className="text-lg text-textprimary leading-relaxed mb-5 font-medium">
+                {checkin.question_text}
+              </p>
 
               {/* Answer Input */}
               {!myAnswer && (
-                <div className="space-y-3">
+                <div>
                   <textarea
                     value={myAnswerText}
                     onChange={(e) => setMyAnswerText(e.target.value)}
-                    placeholder="Share your thoughts..."
-                    className="w-full px-4 py-3 bg-white/50 rounded-xl border border-gray-200 focus:border-[var(--md-sys-color-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--md-sys-color-primary)]/20 text-textprimary placeholder-textsecondary resize-none transition-all"
-                    rows={6}
+                    placeholder="Your words here..."
+                    rows={3}
+                    className="w-full px-4 py-3 rounded-2xl bg-[var(--md-sys-color-surface)] border border-[var(--md-sys-color-outline-variant)]/70 text-textprimary placeholder:text-textmuted transition resize-none text-sm"
                   />
-                  <Button
-                    onClick={handleSubmit}
-                    disabled={!myAnswerText.trim() || submitting}
-                    className="w-full"
-                  >
-                    {submitting ? "Submitting..." : "Submit Reflection"}
-                  </Button>
+                  <div className="flex justify-end mt-3">
+                    <Button
+                      onClick={handleSubmit}
+                      disabled={!myAnswerText.trim() || submitting}
+                      size="sm"
+                    >
+                      {submitting ? "Saving..." : "Share"}
+                    </Button>
+                  </div>
                 </div>
               )}
 
@@ -224,8 +227,9 @@ export default function WeeklyCheckinPage() {
                     </svg>
                     <span>You answered</span>
                   </div>
-                  <div className="p-4 bg-white/30 rounded-xl border border-gray-100">
-                    <p className="text-textprimary font-serif leading-relaxed">
+                  <div className="rounded-2xl bg-[var(--md-sys-color-primary-container)]/60 p-4 border border-[var(--md-sys-color-outline-variant)]/40">
+                    <p className="text-xs text-textmuted mb-1">You wrote</p>
+                    <p className="text-sm text-textprimary leading-relaxed">
                       {myAnswer.answer_text}
                     </p>
                   </div>
@@ -265,8 +269,9 @@ export default function WeeklyCheckinPage() {
                         You
                       </span>
                     </div>
-                    <div className="p-4 bg-[var(--md-sys-color-primary-container)]/30 rounded-xl border border-[var(--md-sys-color-primary)]/20">
-                      <p className="text-textprimary font-serif leading-relaxed">
+                    <div className="rounded-2xl bg-[var(--md-sys-color-primary-container)]/60 p-4 border border-[var(--md-sys-color-outline-variant)]/40">
+                      <p className="text-xs text-textmuted mb-1">You wrote</p>
+                      <p className="text-sm text-textprimary leading-relaxed">
                         {myAnswer?.answer_text}
                       </p>
                     </div>
@@ -284,8 +289,9 @@ export default function WeeklyCheckinPage() {
                         Your Partner
                       </span>
                     </div>
-                    <div className="p-4 bg-[var(--md-sys-color-secondary-container)]/30 rounded-xl border border-[var(--md-sys-color-secondary)]/20">
-                      <p className="text-textprimary font-serif leading-relaxed">
+                    <div className="rounded-2xl bg-[var(--md-sys-color-secondary-container)]/70 p-4 border border-[var(--md-sys-color-outline-variant)]/40">
+                      <p className="text-xs text-textmuted mb-1">Partner wrote</p>
+                      <p className="text-sm text-textprimary leading-relaxed">
                         {partnerAnswer?.answer_text}
                       </p>
                     </div>
