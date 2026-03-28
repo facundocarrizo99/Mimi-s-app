@@ -73,21 +73,25 @@ export async function GET(request: NextRequest) {
     const serviceClient = await createServiceClient();
     const questionIds = existing.map((dq) => dq.id);
     
-    const { data: answers } = await serviceClient
-      .from("answers")
-      .select("*")
-      .in("daily_question_id", questionIds);
+    const [answersResult, favoritesResult] = await Promise.all([
+      serviceClient
+        .from("answers")
+        .select("*")
+        .in("daily_question_id", questionIds),
+      serviceClient
+        .from("favorites")
+        .select("*")
+        .in("daily_question_id", questionIds)
+        .eq("user_id", user.id),
+    ]);
 
-    const { data: favorites } = await serviceClient
-      .from("favorites")
-      .select("*")
-      .in("daily_question_id", questionIds)
-      .eq("user_id", user.id);
+    const answers = answersResult.data || [];
+    const favorites = favoritesResult.data || [];
 
     const withDetails = existing.map((dq) => ({
       ...dq,
-      answers: (answers || []).filter((a) => a.daily_question_id === dq.id),
-      favorites: (favorites || []).filter((f) => f.daily_question_id === dq.id),
+      answers: answers.filter((a) => a.daily_question_id === dq.id),
+      favorites: favorites.filter((f) => f.daily_question_id === dq.id),
     }));
 
     console.log("[daily-questions] answers attached:", withDetails.reduce((sum, q) => sum + q.answers.length, 0));
@@ -114,60 +118,41 @@ export async function GET(request: NextRequest) {
 
   const usedIds = new Set((recentQuestions || []).map((q) => q.question_id));
 
+  const uniqueCategories = Array.from(new Set(DAILY_STRUCTURE));
+  const { data: allCategoryQuestions } = await supabase
+    .from("questions")
+    .select("id, category")
+    .in("category", uniqueCategories);
+
+  const questionsByCategory = new Map<string, { id: string }[]>();
+  for (const category of uniqueCategories) {
+    questionsByCategory.set(category, []);
+  }
+  for (const question of allCategoryQuestions || []) {
+    const bucket = questionsByCategory.get(question.category as string) || [];
+    bucket.push({ id: question.id });
+    questionsByCategory.set(question.category as string, bucket);
+  }
+
   const newDailyQuestions = [];
 
   for (let i = 0; i < DAILY_STRUCTURE.length; i++) {
     const category = DAILY_STRUCTURE[i];
 
-    // Get a random unused question from this category
-    let query = supabase
-      .from("questions")
-      .select("id")
-      .eq("category", category);
+    const available = questionsByCategory.get(category) || [];
+    if (available.length === 0) continue;
 
-    if (usedIds.size > 0) {
-      // Filter out used questions by fetching all and filtering client-side
-      const { data: available } = await query;
-      const filtered = (available || []).filter((q) => !usedIds.has(q.id));
+    const unused = available.filter((q) => !usedIds.has(q.id));
+    const pickPool = unused.length > 0 ? unused : available;
+    const pick = pickPool[Math.floor(Math.random() * pickPool.length)];
 
-      if (filtered.length === 0) {
-        // All questions used — reset and pick any
-        const { data: any } = await supabase
-          .from("questions")
-          .select("id")
-          .eq("category", category);
-        if (!any || any.length === 0) continue;
-        const pick = any[Math.floor(Math.random() * any.length)];
-        newDailyQuestions.push({
-          couple_id,
-          question_id: pick.id,
-          question_date: today,
-          position: i + 1,
-        });
-        usedIds.add(pick.id);
-      } else {
-        const pick = filtered[Math.floor(Math.random() * filtered.length)];
-        newDailyQuestions.push({
-          couple_id,
-          question_id: pick.id,
-          question_date: today,
-          position: i + 1,
-        });
-        usedIds.add(pick.id);
-      }
-    } else {
-      const { data: available } = await query;
-      if (!available || available.length === 0) continue;
-      const pick =
-        available[Math.floor(Math.random() * available.length)];
-      newDailyQuestions.push({
-        couple_id,
-        question_id: pick.id,
-        question_date: today,
-        position: i + 1,
-      });
-      usedIds.add(pick.id);
-    }
+    newDailyQuestions.push({
+      couple_id,
+      question_id: pick.id,
+      question_date: today,
+      position: i + 1,
+    });
+    usedIds.add(pick.id);
   }
 
   // Insert daily questions (use service client — no INSERT RLS policy on daily_questions)
