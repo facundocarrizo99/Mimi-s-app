@@ -28,11 +28,15 @@ export async function GET(request: NextRequest) {
   const dateParam = searchParams.get("date");
   const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10) || 1);
 
-  const { data: profile } = await supabase
-    .from("users")
-    .select("couple_id, timezone")
-    .eq("id", user.id)
-    .single();
+  let profile: { couple_id: string | null; timezone: string | null } | null = null;
+  if (!coupleIdParam) {
+    const { data } = await supabase
+      .from("users")
+      .select("couple_id, timezone")
+      .eq("id", user.id)
+      .single();
+    profile = data;
+  }
 
   const couple_id = coupleIdParam || profile?.couple_id;
 
