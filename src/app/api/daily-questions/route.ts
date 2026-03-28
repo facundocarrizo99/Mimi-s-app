@@ -57,20 +57,16 @@ export async function GET(request: NextRequest) {
     coupleCheck.user_1_id === user.id
       ? coupleCheck.user_2_id
       : coupleCheck.user_1_id;
-  let partnerName = "";
-  if (partnerId) {
-    const { data: partnerProfile } = await serviceClient
-      .from("users")
-      .select("display_name, email")
-      .eq("id", partnerId)
-      .maybeSingle();
-    partnerName =
-      partnerProfile?.display_name ||
-      partnerProfile?.email ||
-      "";
-  }
+  const partnerProfilePromise = partnerId
+    ? serviceClient
+        .from("users")
+        .select("display_name, email")
+        .eq("id", partnerId)
+        .maybeSingle()
+    : Promise.resolve({ data: null });
 
-  const [moodResult, existingResult] = await Promise.all([
+  const [partnerProfileResult, moodResult, existingResult] = await Promise.all([
+    partnerProfilePromise,
     serviceClient
       .from("moods")
       .select("emoji, reflection")
@@ -80,11 +76,18 @@ export async function GET(request: NextRequest) {
       .maybeSingle(),
     serviceClient
       .from("daily_questions")
-      .select("*, question:questions(*), answers(*)")
+      .select(
+        "id, couple_id, question_id, question_date, position, question:questions(id, text, category), answers(id, user_id, text, daily_question_id, created_at)"
+      )
       .eq("couple_id", couple_id)
       .eq("question_date", today)
       .order("position"),
   ]);
+
+  const partnerName =
+    partnerProfileResult.data?.display_name ||
+    partnerProfileResult.data?.email ||
+    "";
 
   const moodRow = moodResult.data;
 
@@ -98,7 +101,7 @@ export async function GET(request: NextRequest) {
 
     const { data: favorites } = await serviceClient
       .from("favorites")
-      .select("*")
+      .select("id, user_id, daily_question_id, created_at")
       .in("daily_question_id", questionIds)
       .eq("user_id", user.id);
 
@@ -188,7 +191,7 @@ export async function GET(request: NextRequest) {
     // Might be a race condition — try fetching again
     const { data: retryExisting } = await serviceClient
       .from("daily_questions")
-      .select("*, question:questions(*)")
+      .select("id, couple_id, question_id, question_date, position, question:questions(id, text, category)")
       .eq("couple_id", couple_id)
       .eq("question_date", today)
       .order("position");
@@ -222,7 +225,7 @@ export async function GET(request: NextRequest) {
   // Fetch the newly created questions with full details
   const { data: created } = await serviceClient
     .from("daily_questions")
-    .select("*, question:questions(*)")
+    .select("id, couple_id, question_id, question_date, position, question:questions(id, text, category)")
     .eq("couple_id", couple_id)
     .eq("question_date", today)
     .order("position");

@@ -14,6 +14,7 @@ const pastDaysDateCache = new Map<
     expiresAt: number;
     allDates: string[];
     dateMap: Record<string, string[]>;
+    answerUsersByQuestionId: Record<string, string[]>;
   }
 >();
 
@@ -107,10 +108,12 @@ async function getPastDatesList(
 
   let dateMap: Record<string, string[]>;
   let allDates: string[];
+  let answerUsersByQuestionId: Record<string, string[]>;
 
   if (cached && cached.expiresAt > now) {
     dateMap = cached.dateMap;
     allDates = cached.allDates;
+    answerUsersByQuestionId = cached.answerUsersByQuestionId;
   } else {
     const { data: allQuestions } = await serviceClient
       .from("daily_questions")
@@ -122,7 +125,6 @@ async function getPastDatesList(
       return jsonResponse({ dates: [], page, hasMore: false, couple });
     }
 
-    // Group question IDs by date
     dateMap = {};
     for (const q of allQuestions) {
       if (!dateMap[q.question_date]) dateMap[q.question_date] = [];
@@ -130,6 +132,30 @@ async function getPastDatesList(
     }
 
     allDates = Object.keys(dateMap).sort((a, b) => b.localeCompare(a));
+    answerUsersByQuestionId = {};
+
+    const allQuestionIds = allQuestions.map((q) => q.id);
+    for (let i = 0; i < allQuestionIds.length; i += IN_BATCH_SIZE) {
+      const batch = allQuestionIds.slice(i, i + IN_BATCH_SIZE);
+      const { data: answersInBatch } = await serviceClient
+        .from("answers")
+        .select("daily_question_id, user_id")
+        .in("daily_question_id", batch);
+
+      for (const answer of answersInBatch || []) {
+        if (!answerUsersByQuestionId[answer.daily_question_id]) {
+          answerUsersByQuestionId[answer.daily_question_id] = [];
+        }
+
+        if (
+          !answerUsersByQuestionId[answer.daily_question_id].includes(
+            answer.user_id
+          )
+        ) {
+          answerUsersByQuestionId[answer.daily_question_id].push(answer.user_id);
+        }
+      }
+    }
 
     if (pastDaysDateCache.size >= PAST_DAYS_MAX_CACHE_ENTRIES) {
       const oldestKey = pastDaysDateCache.keys().next().value;
@@ -142,10 +168,10 @@ async function getPastDatesList(
       expiresAt: now + PAST_DAYS_CACHE_TTL_MS,
       dateMap,
       allDates,
+      answerUsersByQuestionId,
     });
   }
 
-  // Sort dates descending and paginate
   const start = (page - 1) * DATES_PER_PAGE;
   const paginatedDates = allDates.slice(start, start + DATES_PER_PAGE);
   const hasMore = start + DATES_PER_PAGE < allDates.length;
@@ -154,38 +180,6 @@ async function getPastDatesList(
     return jsonResponse({ dates: [], page, hasMore: false, couple });
   }
 
-  // Collect question IDs only for the paginated dates
-  const questionIdsForPage: string[] = [];
-  for (const d of paginatedDates) {
-    questionIdsForPage.push(...dateMap[d]);
-  }
-
-  // Batch .in() queries to stay under PostgREST limits
-  const myAnsweredIds = new Set<string>();
-  const partnerAnsweredIds = new Set<string>();
-
-  for (let i = 0; i < questionIdsForPage.length; i += IN_BATCH_SIZE) {
-    const batch = questionIdsForPage.slice(i, i + IN_BATCH_SIZE);
-
-    const [myRes, partnerRes] = await Promise.all([
-      serviceClient
-        .from("answers")
-        .select("daily_question_id")
-        .eq("user_id", userId)
-        .in("daily_question_id", batch),
-      serviceClient
-        .from("answers")
-        .select("daily_question_id")
-        .neq("user_id", userId)
-        .in("daily_question_id", batch),
-    ]);
-
-    for (const a of myRes.data || []) myAnsweredIds.add(a.daily_question_id);
-    for (const a of partnerRes.data || [])
-      partnerAnsweredIds.add(a.daily_question_id);
-  }
-
-  // Build the date list
   const todayKey = normalizeDateKey(today);
 
   const dates = paginatedDates.map((date) => {
@@ -196,10 +190,12 @@ async function getPastDatesList(
     const questionIds = dateMap[date];
     const totalQuestions = questionIds.length;
     const myAnswerCount = questionIds.filter((id) =>
-      myAnsweredIds.has(id)
+      (answerUsersByQuestionId[id] || []).includes(userId)
     ).length;
     const partnerAnswerCount = questionIds.filter((id) =>
-      partnerAnsweredIds.has(id)
+      (answerUsersByQuestionId[id] || []).some(
+        (answerUserId) => answerUserId !== userId
+      )
     ).length;
 
     return {
