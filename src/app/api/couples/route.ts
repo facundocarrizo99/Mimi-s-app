@@ -15,7 +15,9 @@ export async function GET() {
   // Get all couples where user is user_1 or user_2
   const { data: couples, error } = await supabase
     .from("couples")
-    .select("*")
+    .select(
+      "id, user_1_id, user_2_id, invite_code, timezone, streak_count, last_streak_date, created_at"
+    )
     .or(`user_1_id.eq.${user.id},user_2_id.eq.${user.id}`)
     .order("created_at", { ascending: false });
 

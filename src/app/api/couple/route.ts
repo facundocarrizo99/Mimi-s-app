@@ -11,7 +11,7 @@ export async function GET() {
 
   const { data: profile } = await supabase
     .from("users")
-    .select("*")
+    .select("id, email, display_name, timezone, couple_id")
     .eq("id", user.id)
     .single();
 
@@ -25,7 +25,9 @@ export async function GET() {
   if (profile.couple_id) {
     const { data: coupleData } = await supabase
       .from("couples")
-      .select("*")
+      .select(
+        "id, user_1_id, user_2_id, invite_code, timezone, streak_count, last_streak_date, created_at"
+      )
       .eq("id", profile.couple_id)
       .single();
 
