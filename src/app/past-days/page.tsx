@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { createClient } from "@/lib/supabase/client";
 import { AppShell } from "@/components/layout/AppShell";
 import { Loading } from "@/components/ui/Loading";
 import type { Couple } from "@/types/database";
@@ -29,33 +28,23 @@ export default function PastDaysPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const coupleId = searchParams.get("couple");
-  const supabase = createClient();
+  const inFlightKeyRef = useRef<string | null>(null);
 
   const loadData = useCallback(async () => {
+    if (!coupleId) {
+      router.push("/couples");
+      setLoading(false);
+      return;
+    }
+
+    if (inFlightKeyRef.current === coupleId) {
+      return;
+    }
+
+    inFlightKeyRef.current = coupleId;
     setLoading(true);
 
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
-        router.push("/auth/login");
-        return;
-      }
-
-      if (!coupleId) {
-        router.push("/couples");
-        return;
-      }
-
-      // Couple info for streak
-      const { data: coupleDetail } = await supabase
-        .from("couples")
-        .select("*")
-        .eq("id", coupleId)
-        .single();
-      setCouple(coupleDetail);
-
       // Fetch first page for fast initial render, then stream remaining pages.
       const aggregatedDates: PastDate[] = [];
       let page = 1;
@@ -68,8 +57,21 @@ export default function PastDaysPage() {
         });
       } catch (error) {
         console.error("Failed to fetch past-days page", { page, error });
+        setCouple(null);
         setDates([]);
         setSelectedMonth(getCurrentMonth());
+        setLoading(false);
+        return;
+      }
+
+      if (firstResponse.status === 401) {
+        router.push("/auth/login");
+        setLoading(false);
+        return;
+      }
+
+      if (firstResponse.status === 403 || firstResponse.status === 404) {
+        router.push("/couples");
         setLoading(false);
         return;
       }
@@ -80,6 +82,7 @@ export default function PastDaysPage() {
           status: firstResponse.status,
           statusText: firstResponse.statusText,
         });
+        setCouple(null);
         setDates([]);
         setSelectedMonth(getCurrentMonth());
         setLoading(false);
@@ -89,15 +92,18 @@ export default function PastDaysPage() {
       const firstPageData = (await firstResponse.json().catch(() => ({}))) as {
         dates?: PastDate[];
         hasMore?: boolean;
+        couple?: Couple | null;
       };
 
       if (!Array.isArray(firstPageData.dates)) {
+        setCouple(null);
         setDates([]);
         setSelectedMonth(getCurrentMonth());
         setLoading(false);
         return;
       }
 
+      setCouple(firstPageData.couple ?? null);
       aggregatedDates.push(...firstPageData.dates);
       setDates([...aggregatedDates]);
 
@@ -149,12 +155,17 @@ export default function PastDaysPage() {
       }
     } catch (error) {
       console.error("Failed to load past-days data", error);
+      setCouple(null);
       setDates([]);
       setSelectedMonth(getCurrentMonth());
+    } finally {
+      if (inFlightKeyRef.current === coupleId) {
+        inFlightKeyRef.current = null;
+      }
+      setLoading(false);
     }
-    setLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [coupleId]);
+  }, [coupleId, router]);
 
   useEffect(() => {
     loadData();

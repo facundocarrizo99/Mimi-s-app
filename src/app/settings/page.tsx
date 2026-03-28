@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import { AppShell } from "@/components/layout/AppShell";
@@ -50,36 +50,53 @@ export default function SettingsPage() {
   const [passkeyBusy, setPasskeyBusy] = useState(false);
   const [passkeyMessage, setPasskeyMessage] = useState("");
   const [passkeyError, setPasskeyError] = useState("");
+  const inFlightRef = useRef(false);
 
   const loadData = useCallback(async () => {
+    if (inFlightRef.current) {
+      return;
+    }
+
+    inFlightRef.current = true;
     const supabase = createClient();
-    const res = await fetch("/api/couple");
-    const data = await res.json();
+    try {
+      const [coupleResponse, factorResponse] = await Promise.all([
+        fetch("/api/couple", { cache: "no-store" }),
+        supabase.auth.mfa.listFactors(),
+      ]);
 
-    setProfile(data.user);
-    setPartner(data.partner);
-    setDisplayName(data.user?.display_name || "");
-    setTimezone(data.user?.timezone || "America/New_York");
+      if (coupleResponse.status === 401) {
+        window.location.href = "/auth/login";
+        return;
+      }
 
-    if (data.user?.couple_id) {
-      const { data: coupleData } = await supabase
-        .from("couples")
-        .select("*")
-        .eq("id", data.user.couple_id)
-        .single();
-      setCouple(coupleData);
+      if (!coupleResponse.ok) {
+        console.error("Failed to load settings bootstrap", {
+          status: coupleResponse.status,
+          statusText: coupleResponse.statusText,
+        });
+        return;
+      }
+
+      const data = await coupleResponse.json();
+
+      setProfile(data.user || null);
+      setPartner(data.partner || null);
+      setCouple(data.couple || null);
+      setDisplayName(data.user?.display_name || "");
+      setTimezone(data.user?.timezone || "America/New_York");
+
+      if (typeof window !== "undefined") {
+        setPasskeySupported(
+          Boolean(window.PublicKeyCredential && navigator.credentials)
+        );
+      }
+
+      setPasskeys((factorResponse.data?.all || []).filter((f) => f.factor_type === "webauthn"));
+    } finally {
+      setLoading(false);
+      inFlightRef.current = false;
     }
-
-    if (typeof window !== "undefined") {
-      setPasskeySupported(
-        Boolean(window.PublicKeyCredential && navigator.credentials)
-      );
-    }
-
-    const { data: factorData } = await supabase.auth.mfa.listFactors();
-    setPasskeys((factorData?.all || []).filter((f) => f.factor_type === "webauthn"));
-
-    setLoading(false);
   }, []);
 
   useEffect(() => {
