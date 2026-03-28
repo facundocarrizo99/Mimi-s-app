@@ -48,6 +48,7 @@ export default function MonthlySummaryPage() {
   const loadData = useCallback(async () => {
     const supabase = createClient();
     setLoading(true);
+    setSummary(null);
 
     const {
       data: { user },
@@ -55,22 +56,15 @@ export default function MonthlySummaryPage() {
     
     if (!user) {
       router.push("/auth/login");
+      setLoading(false);
       return;
     }
 
     if (!coupleId) {
       router.push("/couples");
+      setLoading(false);
       return;
     }
-
-    // Load couple info
-    const { data: coupleDetail } = await supabase
-      .from("couples")
-      .select("*")
-      .eq("id", coupleId)
-      .single();
-    
-    setCouple(coupleDetail);
 
     // Determine which month to show (default to current month)
     const month = monthParam || getCurrentMonth();
@@ -80,22 +74,53 @@ export default function MonthlySummaryPage() {
     const months = generateAvailableMonths(12);
     setAvailableMonths(months);
 
-    // Load summary data
-    const res = await fetch(`/api/monthly-summary?couple_id=${coupleId}&month=${month}`);
-    
-    if (!res.ok) {
-      console.error("Failed to load summary:", res.status);
-      setLoading(false);
-      return;
-    }
+    try {
+      const [coupleResult, summaryResult] = await Promise.allSettled([
+        supabase
+          .from("couples")
+          .select("*")
+          .eq("id", coupleId)
+          .single(),
+        fetch(`/api/monthly-summary?couple_id=${coupleId}&month=${month}`),
+      ]);
 
-    const data = await res.json();
+      if (coupleResult.status === "fulfilled") {
+        if (coupleResult.value.error) {
+          console.error("Failed to load couple details", coupleResult.value.error);
+          setCouple(null);
+        } else {
+          setCouple(coupleResult.value.data ?? null);
+        }
+      } else {
+        console.error("Couple query failed", coupleResult.reason);
+        setCouple(null);
+      }
 
-    if (!data.error) {
+      if (summaryResult.status === "rejected") {
+        console.error("Monthly summary request failed", summaryResult.reason);
+        return;
+      }
+
+      if (!summaryResult.value.ok) {
+        console.error("Failed to load summary", {
+          status: summaryResult.value.status,
+          statusText: summaryResult.value.statusText,
+        });
+        return;
+      }
+
+      const data = await summaryResult.value.json();
+      if (data?.error) {
+        console.error("Monthly summary API returned an error payload", data);
+        return;
+      }
+
       setSummary(data);
+    } catch (error) {
+      console.error("Failed to load monthly summary page data", error);
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   }, [coupleId, monthParam, router]);
 
   useEffect(() => {
