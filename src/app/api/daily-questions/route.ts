@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
   // Verify user belongs to this couple
   const { data: coupleCheck } = await supabase
     .from("couples")
-    .select("id, timezone, streak_count")
+    .select("id, timezone, streak_count, user_1_id, user_2_id")
     .eq("id", couple_id)
     .or(`user_1_id.eq.${user.id},user_2_id.eq.${user.id}`)
     .single();
@@ -52,6 +52,23 @@ export async function GET(request: NextRequest) {
   const today = getDateInTimezone(timezone);
 
   const serviceClient = await createServiceClient();
+
+  const partnerId =
+    coupleCheck.user_1_id === user.id
+      ? coupleCheck.user_2_id
+      : coupleCheck.user_1_id;
+  let partnerName = "";
+  if (partnerId) {
+    const { data: partnerProfile } = await serviceClient
+      .from("users")
+      .select("display_name, email")
+      .eq("id", partnerId)
+      .maybeSingle();
+    partnerName =
+      partnerProfile?.display_name ||
+      partnerProfile?.email ||
+      "";
+  }
 
   const [moodResult, existingResult] = await Promise.all([
     serviceClient
@@ -97,6 +114,7 @@ export async function GET(request: NextRequest) {
         date: today,
         couple: coupleCheck,
         currentUserId: user.id,
+        partnerName,
         currentMood: moodRow ? { emoji: moodRow.emoji, reflection: moodRow.reflection } : null,
       },
       { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } }
@@ -177,6 +195,7 @@ export async function GET(request: NextRequest) {
           date: today,
           couple: coupleCheck,
           currentUserId: user.id,
+          partnerName,
           currentMood: moodRow ? { emoji: moodRow.emoji, reflection: moodRow.reflection } : null,
         },
         { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } }
@@ -209,6 +228,7 @@ export async function GET(request: NextRequest) {
       date: today,
       couple: coupleCheck,
       currentUserId: user.id,
+      partnerName,
       currentMood: moodRow ? { emoji: moodRow.emoji, reflection: moodRow.reflection } : null,
     },
     { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } }
