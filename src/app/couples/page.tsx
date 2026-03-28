@@ -52,19 +52,29 @@ export default function CouplesPage() {
       return;
     }
 
-    // Get user profile for display name
-    const { data: profileData } = await supabase
-      .from("users")
-      .select("display_name")
-      .eq("id", user.id)
-      .single();
+    const [profileResult, couplesResponse] = await Promise.all([
+      supabase
+        .from("users")
+        .select("display_name")
+        .eq("id", user.id)
+        .single(),
+      fetch("/api/couples", { cache: "no-store" }),
+    ]);
 
-    if (profileData) {
-      setDisplayName(profileData.display_name || "");
+    if (profileResult.data) {
+      setDisplayName(profileResult.data.display_name || "");
     }
 
-    const res = await fetch("/api/couples", { cache: "no-store" });
-    const data = await res.json();
+    if (!couplesResponse.ok) {
+      console.error("Failed to load couples", {
+        status: couplesResponse.status,
+        statusText: couplesResponse.statusText,
+      });
+      setLoading(false);
+      return;
+    }
+
+    const data = await couplesResponse.json();
     const fetchedCouples: CoupleWithPartner[] = data.couples || [];
 
     // If user has exactly 1 complete couple, auto-redirect to daily
