@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 
 const DATES_PER_PAGE = 30;
 const IN_BATCH_SIZE = 200;
-const PAST_DAYS_CACHE_TTL_MS = 30_000;
+const PAST_DAYS_CACHE_TTL_MS = 300_000;
 
 const pastDaysDateCache = new Map<
   string,

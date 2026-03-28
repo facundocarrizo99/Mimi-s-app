@@ -36,16 +36,6 @@ export async function GET() {
     .filter((partnerId): partnerId is string => Boolean(partnerId));
 
   const partnersById = new Map<string, { id: string; display_name: string; email: string }>();
-  if (partnerIds.length > 0) {
-    const { data: partners } = await serviceClient
-      .from("users")
-      .select("id, display_name, email")
-      .in("id", partnerIds);
-
-    for (const partner of partners || []) {
-      partnersById.set(partner.id, partner);
-    }
-  }
 
   const todayByCoupleId = new Map<string, string>();
   const uniqueDates = new Set<string>();
@@ -56,15 +46,31 @@ export async function GET() {
   }
 
   const coupleIds = couplesList.map((couple) => couple.id);
-  let dailyQuestions: { id: string; couple_id: string; question_date: string }[] = [];
-  if (coupleIds.length > 0 && uniqueDates.size > 0) {
-    const { data } = await serviceClient
-      .from("daily_questions")
-      .select("id, couple_id, question_date")
-      .in("couple_id", coupleIds)
-      .in("question_date", Array.from(uniqueDates));
-    dailyQuestions = data || [];
+  const partnerPromise = partnerIds.length > 0
+    ? serviceClient
+        .from("users")
+        .select("id, display_name, email")
+        .in("id", partnerIds)
+    : Promise.resolve({ data: [] as { id: string; display_name: string; email: string }[] });
+
+  const dailyQuestionsPromise = coupleIds.length > 0 && uniqueDates.size > 0
+    ? serviceClient
+        .from("daily_questions")
+        .select("id, couple_id, question_date")
+        .in("couple_id", coupleIds)
+        .in("question_date", Array.from(uniqueDates))
+    : Promise.resolve({ data: [] as { id: string; couple_id: string; question_date: string }[] });
+
+  const [partnersResult, dailyQuestionsResult] = await Promise.all([
+    partnerPromise,
+    dailyQuestionsPromise,
+  ]);
+
+  for (const partner of partnersResult.data || []) {
+    partnersById.set(partner.id, partner);
   }
+
+  const dailyQuestions = dailyQuestionsResult.data || [];
 
   const questionIdsByCoupleId = new Map<string, string[]>();
   for (const question of dailyQuestions) {

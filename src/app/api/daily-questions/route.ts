@@ -51,26 +51,32 @@ export async function GET(request: NextRequest) {
   // Get today's date in the couple's timezone
   const today = getDateInTimezone(timezone);
 
-  const { data: moodRow } = await supabase
-    .from("moods")
-    .select("emoji, reflection")
-    .eq("couple_id", couple_id)
-    .eq("mood_date", today)
-    .eq("user_id", user.id)
-    .maybeSingle();
+  const serviceClient = await createServiceClient();
+
+  const [moodResult, existingResult] = await Promise.all([
+    serviceClient
+      .from("moods")
+      .select("emoji, reflection")
+      .eq("couple_id", couple_id)
+      .eq("mood_date", today)
+      .eq("user_id", user.id)
+      .maybeSingle(),
+    serviceClient
+      .from("daily_questions")
+      .select("*, question:questions(*), answers(*)")
+      .eq("couple_id", couple_id)
+      .eq("question_date", today)
+      .order("position"),
+  ]);
+
+  const moodRow = moodResult.data;
 
   // Check if daily questions already exist for today
-  const { data: existing } = await supabase
-    .from("daily_questions")
-    .select("*, question:questions(*), answers(*)")
-    .eq("couple_id", couple_id)
-    .eq("question_date", today)
-    .order("position");
+  const existing = existingResult.data;
 
   if (existing && existing.length === 7) {
     // Load favorites for these questions using service client.
     // Answers are already included in the query above.
-    const serviceClient = await createServiceClient();
     const questionIds = existing.map((dq) => dq.id);
 
     const { data: favorites } = await serviceClient
@@ -99,7 +105,7 @@ export async function GET(request: NextRequest) {
 
   // Generate new daily questions
   // Get already-used question IDs for this couple (last 60 days to avoid repeats)
-  const { data: recentQuestions } = await supabase
+  const { data: recentQuestions } = await serviceClient
     .from("daily_questions")
     .select("question_id")
     .eq("couple_id", couple_id)
@@ -108,7 +114,7 @@ export async function GET(request: NextRequest) {
   const usedIds = new Set((recentQuestions || []).map((q) => q.question_id));
 
   const uniqueCategories = Array.from(new Set(DAILY_STRUCTURE));
-  const { data: allCategoryQuestions } = await supabase
+  const { data: allCategoryQuestions } = await serviceClient
     .from("questions")
     .select("id, category")
     .in("category", uniqueCategories);
@@ -145,14 +151,13 @@ export async function GET(request: NextRequest) {
   }
 
   // Insert daily questions (use service client — no INSERT RLS policy on daily_questions)
-  const serviceClient = await createServiceClient();
   const { error: insertError } = await serviceClient
     .from("daily_questions")
     .insert(newDailyQuestions);
 
   if (insertError) {
     // Might be a race condition — try fetching again
-    const { data: retryExisting } = await supabase
+    const { data: retryExisting } = await serviceClient
       .from("daily_questions")
       .select("*, question:questions(*)")
       .eq("couple_id", couple_id)
@@ -185,7 +190,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Fetch the newly created questions with full details
-  const { data: created } = await supabase
+  const { data: created } = await serviceClient
     .from("daily_questions")
     .select("*, question:questions(*)")
     .eq("couple_id", couple_id)
