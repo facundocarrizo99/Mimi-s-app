@@ -30,9 +30,9 @@ export default function DailyPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const coupleId = searchParams.get("couple");
-  const supabase = createClient();
 
   const loadData = useCallback(async () => {
+    const supabase = createClient();
     setLoading(true);
 
     const {
@@ -40,49 +40,73 @@ export default function DailyPage() {
     } = await supabase.auth.getUser();
     if (!user) {
       router.push("/auth/login");
+      setLoading(false);
       return;
     }
 
     if (!coupleId) {
       router.push("/couples");
+      setLoading(false);
       return;
     }
 
     setUserId(user.id);
 
-    // Couple
-    const { data: coupleDetail } = await supabase
-      .from("couples")
-      .select("*")
-      .eq("id", coupleId)
-      .single();
-    setCouple(coupleDetail);
+    try {
+      const [coupleResult, questionsResponse] = await Promise.all([
+        supabase
+          .from("couples")
+          .select("*")
+          .eq("id", coupleId)
+          .single(),
+        fetch(`/api/daily-questions?couple_id=${coupleId}`),
+      ]);
 
-    // Questions + answers from API (uses service client, bypasses RLS)
-    const res = await fetch(`/api/daily-questions?couple_id=${coupleId}`);
-    const data = await res.json();
-
-    if (data.questions) {
-      setQuestions(data.questions);
-      setDate(data.date);
-    }
-
-    // Mood
-    if (data.date) {
-      const { data: moodRow } = await supabase
-        .from("moods")
-        .select("*")
-        .eq("couple_id", coupleId)
-        .eq("mood_date", data.date)
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (moodRow) {
-        setCurrentMood({ emoji: moodRow.emoji, reflection: moodRow.reflection });
+      if (coupleResult.error) {
+        console.error("Failed to load couple details", coupleResult.error);
+        setCouple(null);
+      } else {
+        setCouple(coupleResult.data ?? null);
       }
-    }
 
-    setLoading(false);
+      if (!questionsResponse.ok) {
+        console.error("Failed to load daily questions", {
+          status: questionsResponse.status,
+          statusText: questionsResponse.statusText,
+        });
+        return;
+      }
+
+      const data = await questionsResponse.json();
+      if (!data || data.error) {
+        console.error("Daily questions API returned an invalid payload", data);
+        return;
+      }
+
+      if (data.questions) {
+        setQuestions(data.questions);
+        setDate(data.date);
+      }
+
+      // Mood
+      if (data.date) {
+        const { data: moodRow } = await supabase
+          .from("moods")
+          .select("*")
+          .eq("couple_id", coupleId)
+          .eq("mood_date", data.date)
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+        if (moodRow) {
+          setCurrentMood({ emoji: moodRow.emoji, reflection: moodRow.reflection });
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load daily page data", error);
+    } finally {
+      setLoading(false);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [coupleId]);
 
@@ -91,28 +115,53 @@ export default function DailyPage() {
   }, [loadData]);
 
   async function handleAnswer(dailyQuestionId: string, text: string) {
+    const supabase = createClient();
     // Save answer
-    await fetch("/api/daily-questions/answer", {
+    const saveResponse = await fetch("/api/daily-questions/answer", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ daily_question_id: dailyQuestionId, text }),
     });
 
-    // Reload everything from API — answers come back via service client
-    const res = await fetch(`/api/daily-questions?couple_id=${coupleId}`);
-    const data = await res.json();
-    if (data.questions) {
-      setQuestions(data.questions);
+    if (!saveResponse.ok) {
+      console.error("Failed to save answer", {
+        status: saveResponse.status,
+        statusText: saveResponse.statusText,
+      });
+      return;
     }
 
-    // Reload couple for streak
     if (coupleId) {
-      const { data: coupleDetail } = await supabase
-        .from("couples")
-        .select("*")
-        .eq("id", coupleId)
-        .single();
-      setCouple(coupleDetail);
+      try {
+        const [questionsResponse, coupleResult] = await Promise.all([
+          fetch(`/api/daily-questions?couple_id=${coupleId}`),
+          supabase
+            .from("couples")
+            .select("*")
+            .eq("id", coupleId)
+            .single(),
+        ]);
+
+        if (questionsResponse.ok) {
+          const data = await questionsResponse.json();
+          if (data?.questions) {
+            setQuestions(data.questions);
+          }
+        } else {
+          console.error("Failed to refresh daily questions", {
+            status: questionsResponse.status,
+            statusText: questionsResponse.statusText,
+          });
+        }
+
+        if (coupleResult.error) {
+          console.error("Failed to refresh couple details", coupleResult.error);
+        } else {
+          setCouple(coupleResult.data ?? null);
+        }
+      } catch (error) {
+        console.error("Failed to refresh daily page after answer", error);
+      }
     }
   }
 
