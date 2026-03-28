@@ -344,7 +344,7 @@ export default function PastDaysPage() {
             })}
           </div>
 
-          <div className="flex items-center gap-4 mt-4 text-[11px] text-textsecondary">
+          <div className="flex items-center justify-center flex-wrap gap-4 mt-4 text-[11px] text-textsecondary">
             <span className="inline-flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full bg-[var(--status-success)]" />
               Both finished
