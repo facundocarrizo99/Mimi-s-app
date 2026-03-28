@@ -174,6 +174,17 @@ export async function GET(request: NextRequest) {
     .insert(newDailyQuestions);
 
   if (insertError) {
+    const isRaceCondition =
+      insertError.code === "23505" ||
+      insertError.message.toLowerCase().includes("duplicate");
+
+    if (!isRaceCondition) {
+      return NextResponse.json(
+        { error: `Failed to generate questions: ${insertError.message}` },
+        { status: 500 }
+      );
+    }
+
     // Might be a race condition — try fetching again
     const { data: retryExisting } = await serviceClient
       .from("daily_questions")

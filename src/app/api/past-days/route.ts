@@ -6,6 +6,7 @@ export const dynamic = "force-dynamic";
 const DATES_PER_PAGE = 30;
 const IN_BATCH_SIZE = 200;
 const PAST_DAYS_CACHE_TTL_MS = 300_000;
+const PAST_DAYS_MAX_CACHE_ENTRIES = 200;
 
 const pastDaysDateCache = new Map<
   string,
@@ -129,6 +130,14 @@ async function getPastDatesList(
     }
 
     allDates = Object.keys(dateMap).sort((a, b) => b.localeCompare(a));
+
+    if (pastDaysDateCache.size >= PAST_DAYS_MAX_CACHE_ENTRIES) {
+      const oldestKey = pastDaysDateCache.keys().next().value;
+      if (oldestKey) {
+        pastDaysDateCache.delete(oldestKey);
+      }
+    }
+
     pastDaysDateCache.set(coupleId, {
       expiresAt: now + PAST_DAYS_CACHE_TTL_MS,
       dateMap,

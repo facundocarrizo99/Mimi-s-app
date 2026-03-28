@@ -85,10 +85,19 @@ export async function GET(request: NextRequest) {
       .eq("category", filter);
 
     if (catQuestions) {
-      query = query.in(
-        "question_id",
-        catQuestions.map((q) => q.id)
-      );
+      const categoryQuestionIds = catQuestions.map((q) => q.id);
+      if (categoryQuestionIds.length === 0) {
+        return NextResponse.json({
+          entries: {},
+          total: 0,
+          onThisDay: [],
+          couple,
+          currentUserId: user.id,
+          page,
+        });
+      }
+
+      query = query.in("question_id", categoryQuestionIds);
     }
   }
 
