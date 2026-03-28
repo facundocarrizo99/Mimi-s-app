@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { createClient } from "@/lib/supabase/client";
 import { AppShell } from "@/components/layout/AppShell";
 import { QuestionCard } from "@/components/daily/QuestionCard";
 import { MoodSelector } from "@/components/daily/MoodSelector";
@@ -30,43 +29,35 @@ export default function DailyPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const coupleId = searchParams.get("couple");
+  const inFlightKeyRef = useRef<string | null>(null);
 
   const loadData = useCallback(async () => {
-    const supabase = createClient();
-    setLoading(true);
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      router.push("/auth/login");
-      setLoading(false);
-      return;
-    }
-
     if (!coupleId) {
       router.push("/couples");
       setLoading(false);
       return;
     }
 
-    setUserId(user.id);
+    if (inFlightKeyRef.current === coupleId) {
+      return;
+    }
+
+    inFlightKeyRef.current = coupleId;
+    setLoading(true);
 
     try {
-      const [coupleResult, questionsResponse] = await Promise.all([
-        supabase
-          .from("couples")
-          .select("*")
-          .eq("id", coupleId)
-          .single(),
-        fetch(`/api/daily-questions?couple_id=${coupleId}`),
-      ]);
+      const questionsResponse = await fetch(`/api/daily-questions?couple_id=${coupleId}`, {
+        cache: "no-store",
+      });
 
-      if (coupleResult.error) {
-        console.error("Failed to load couple details", coupleResult.error);
-        setCouple(null);
-      } else {
-        setCouple(coupleResult.data ?? null);
+      if (questionsResponse.status === 401) {
+        router.push("/auth/login");
+        return;
+      }
+
+      if (questionsResponse.status === 403 || questionsResponse.status === 404) {
+        router.push("/couples");
+        return;
       }
 
       if (!questionsResponse.ok) {
@@ -83,39 +74,30 @@ export default function DailyPage() {
         return;
       }
 
+      setUserId(data.currentUserId || "");
+      setCouple(data.couple ?? null);
+
       if (data.questions) {
         setQuestions(data.questions);
         setDate(data.date);
       }
-
-      // Mood
-      if (data.date) {
-        const { data: moodRow } = await supabase
-          .from("moods")
-          .select("*")
-          .eq("couple_id", coupleId)
-          .eq("mood_date", data.date)
-          .eq("user_id", user.id)
-          .maybeSingle();
-
-        if (moodRow) {
-          setCurrentMood({ emoji: moodRow.emoji, reflection: moodRow.reflection });
-        }
-      }
+      setCurrentMood(data.currentMood ?? null);
     } catch (error) {
       console.error("Failed to load daily page data", error);
     } finally {
+      if (inFlightKeyRef.current === coupleId) {
+        inFlightKeyRef.current = null;
+      }
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [coupleId]);
+  }, [coupleId, router]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
 
   async function handleAnswer(dailyQuestionId: string, text: string) {
-    const supabase = createClient();
     // Save answer
     const saveResponse = await fetch("/api/daily-questions/answer", {
       method: "POST",
@@ -133,31 +115,42 @@ export default function DailyPage() {
 
     if (coupleId) {
       try {
-        const [questionsResponse, coupleResult] = await Promise.all([
-          fetch(`/api/daily-questions?couple_id=${coupleId}`),
-          supabase
-            .from("couples")
-            .select("*")
-            .eq("id", coupleId)
-            .single(),
-        ]);
+        const questionsResponse = await fetch(`/api/daily-questions?couple_id=${coupleId}`, {
+          cache: "no-store",
+        });
+
+        if (questionsResponse.status === 401) {
+          router.push("/auth/login");
+          return;
+        }
+
+        if (questionsResponse.status === 403 || questionsResponse.status === 404) {
+          router.push("/couples");
+          return;
+        }
 
         if (questionsResponse.ok) {
           const data = await questionsResponse.json();
           if (data?.questions) {
             setQuestions(data.questions);
           }
+          if (data?.couple) {
+            setCouple(data.couple);
+          }
+          if (data?.currentMood !== undefined) {
+            setCurrentMood(data.currentMood ?? null);
+          }
+          if (data?.currentUserId) {
+            setUserId(data.currentUserId);
+          }
+          if (data?.date) {
+            setDate(data.date);
+          }
         } else {
           console.error("Failed to refresh daily questions", {
             status: questionsResponse.status,
             statusText: questionsResponse.statusText,
           });
-        }
-
-        if (coupleResult.error) {
-          console.error("Failed to refresh couple details", coupleResult.error);
-        } else {
-          setCouple(coupleResult.data ?? null);
         }
       } catch (error) {
         console.error("Failed to refresh daily page after answer", error);

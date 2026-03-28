@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { createClient } from "@/lib/supabase/client";
 import { AppShell } from "@/components/layout/AppShell";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -30,38 +29,36 @@ export default function WeeklyCheckinPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const coupleId = searchParams.get("couple");
+  const inFlightKeyRef = useRef<string | null>(null);
 
   const loadData = useCallback(async () => {
-    const supabase = createClient();
-    setLoading(true);
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    
-    if (!user) {
-      router.push("/auth/login");
-      setLoading(false);
-      return;
-    }
-
     if (!coupleId) {
       router.push("/couples");
       setLoading(false);
       return;
     }
 
-    setUserId(user.id);
+    if (inFlightKeyRef.current === coupleId) {
+      return;
+    }
+
+    inFlightKeyRef.current = coupleId;
+    setLoading(true);
 
     try {
-      const [coupleResult, checkinResponse] = await Promise.all([
-        supabase
-          .from("couples")
-          .select("*")
-          .eq("id", coupleId)
-          .single(),
-        fetch(`/api/weekly-checkin?couple_id=${coupleId}`),
-      ]);
+      const checkinResponse = await fetch(`/api/weekly-checkin?couple_id=${coupleId}`, {
+        cache: "no-store",
+      });
+
+      if (checkinResponse.status === 401) {
+        router.push("/auth/login");
+        return;
+      }
+
+      if (checkinResponse.status === 403 || checkinResponse.status === 404) {
+        router.push("/couples");
+        return;
+      }
 
       if (!checkinResponse.ok) {
         console.error("Failed to load weekly check-in", {
@@ -77,7 +74,8 @@ export default function WeeklyCheckinPage() {
         return;
       }
 
-      setCouple(coupleResult.data ?? null);
+      setUserId(data.currentUserId || "");
+      setCouple(data.couple ?? null);
 
       if (data.checkin) {
         setCheckin(data.checkin);
@@ -85,7 +83,7 @@ export default function WeeklyCheckinPage() {
         setWeekStartDate(data.weekStartDate);
 
         // Pre-fill existing answer
-        const myAnswer = data.answers?.find((a: WeeklyCheckinAnswer) => a.user_id === user.id);
+        const myAnswer = data.answers?.find((a: WeeklyCheckinAnswer) => a.user_id === data.currentUserId);
         if (myAnswer) {
           setMyAnswerText(myAnswer.answer_text);
         }
@@ -93,6 +91,9 @@ export default function WeeklyCheckinPage() {
     } catch (error) {
       console.error("Failed to load weekly-checkin page data", error);
     } finally {
+      if (inFlightKeyRef.current === coupleId) {
+        inFlightKeyRef.current = null;
+      }
       setLoading(false);
     }
   }, [coupleId, router]);

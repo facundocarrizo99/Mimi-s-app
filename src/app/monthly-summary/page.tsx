@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { createClient } from "@/lib/supabase/client";
 import { AppShell } from "@/components/layout/AppShell";
 import { Card } from "@/components/ui/Card";
 import { Loading } from "@/components/ui/Loading";
@@ -44,22 +43,9 @@ export default function MonthlySummaryPage() {
   const router = useRouter();
   const coupleId = searchParams.get("couple");
   const monthParam = searchParams.get("month");
+  const inFlightKeyRef = useRef<string | null>(null);
 
   const loadData = useCallback(async () => {
-    const supabase = createClient();
-    setLoading(true);
-    setSummary(null);
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    
-    if (!user) {
-      router.push("/auth/login");
-      setLoading(false);
-      return;
-    }
-
     if (!coupleId) {
       router.push("/couples");
       setLoading(false);
@@ -68,6 +54,15 @@ export default function MonthlySummaryPage() {
 
     // Determine which month to show (default to current month)
     const month = monthParam || getCurrentMonth();
+    const loadKey = `${coupleId}:${month}`;
+
+    if (inFlightKeyRef.current === loadKey) {
+      return;
+    }
+
+    inFlightKeyRef.current = loadKey;
+    setLoading(true);
+    setSummary(null);
     setSelectedMonth(month);
 
     // Generate available months (last 12 months)
@@ -75,50 +70,43 @@ export default function MonthlySummaryPage() {
     setAvailableMonths(months);
 
     try {
-      const [coupleResult, summaryResult] = await Promise.allSettled([
-        supabase
-          .from("couples")
-          .select("*")
-          .eq("id", coupleId)
-          .single(),
-        fetch(`/api/monthly-summary?couple_id=${coupleId}&month=${month}`),
-      ]);
+      const summaryResponse = await fetch(
+        `/api/monthly-summary?couple_id=${coupleId}&month=${month}`,
+        { cache: "no-store" }
+      );
 
-      if (coupleResult.status === "fulfilled") {
-        if (coupleResult.value.error) {
-          console.error("Failed to load couple details", coupleResult.value.error);
-          setCouple(null);
-        } else {
-          setCouple(coupleResult.value.data ?? null);
-        }
-      } else {
-        console.error("Couple query failed", coupleResult.reason);
-        setCouple(null);
-      }
-
-      if (summaryResult.status === "rejected") {
-        console.error("Monthly summary request failed", summaryResult.reason);
+      if (summaryResponse.status === 401) {
+        router.push("/auth/login");
         return;
       }
 
-      if (!summaryResult.value.ok) {
+      if (summaryResponse.status === 403 || summaryResponse.status === 404) {
+        router.push("/couples");
+        return;
+      }
+
+      if (!summaryResponse.ok) {
         console.error("Failed to load summary", {
-          status: summaryResult.value.status,
-          statusText: summaryResult.value.statusText,
+          status: summaryResponse.status,
+          statusText: summaryResponse.statusText,
         });
         return;
       }
 
-      const data = await summaryResult.value.json();
+      const data = await summaryResponse.json();
       if (data?.error) {
         console.error("Monthly summary API returned an error payload", data);
         return;
       }
 
+      setCouple(data.couple ?? null);
       setSummary(data);
     } catch (error) {
       console.error("Failed to load monthly summary page data", error);
     } finally {
+      if (inFlightKeyRef.current === loadKey) {
+        inFlightKeyRef.current = null;
+      }
       setLoading(false);
     }
   }, [coupleId, monthParam, router]);
