@@ -18,11 +18,15 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const coupleIdParam = searchParams.get("couple_id");
 
-  const { data: profile } = await supabase
-    .from("users")
-    .select("couple_id, timezone")
-    .eq("id", user.id)
-    .single();
+  let profile: { couple_id: string | null; timezone: string | null } | null = null;
+  if (!coupleIdParam) {
+    const { data } = await supabase
+      .from("users")
+      .select("couple_id, timezone")
+      .eq("id", user.id)
+      .single();
+    profile = data;
+  }
 
   const couple_id = coupleIdParam || profile?.couple_id;
 
