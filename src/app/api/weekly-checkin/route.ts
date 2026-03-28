@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
   const timezone = couple.timezone || profile?.timezone || "America/New_York";
   
   // Calculate the start of the current week (Sunday)
-  const weekStartDate = getWeekStartDate(timezone);
+  const weekStartDate = normalizeDateToISO(getWeekStartDate(timezone));
 
   // Check if weekly check-in exists for this week
   const { data: existingCheckin } = await supabase
@@ -123,11 +123,43 @@ export async function GET(request: NextRequest) {
     newCheckin = existingAfterConflict;
   }
 
+  // Fallback path: try RPC using authenticated client when service insert fails.
   if (!newCheckin) {
-    return NextResponse.json(
-      { error: "Failed to create weekly check-in" },
-      { status: 500 }
+    const { data: checkinIdResult, error: rpcError } = await supabase.rpc(
+      "create_or_get_weekly_checkin",
+      {
+        p_couple_id: couple_id,
+        p_week_start_date: weekStartDate,
+        p_question_text: questionText,
+      }
     );
+
+    if (checkinIdResult) {
+      const { data: rpcCheckin } = await supabase
+        .from("weekly_checkins")
+        .select("*")
+        .eq("id", checkinIdResult)
+        .single();
+
+      if (rpcCheckin) {
+        newCheckin = rpcCheckin;
+      }
+    }
+
+    if (!newCheckin) {
+      return NextResponse.json(
+        {
+          error: "Failed to create weekly check-in",
+          details: {
+            insert_code: insertError?.code || null,
+            insert_message: insertError?.message || null,
+            rpc_code: rpcError?.code || null,
+            rpc_message: rpcError?.message || null,
+          },
+        },
+        { status: 500 }
+      );
+    }
   }
 
   return NextResponse.json(
@@ -282,4 +314,24 @@ function simpleHash(str: string): number {
     hash = hash & hash; // Convert to 32-bit integer
   }
   return Math.abs(hash);
+}
+
+function normalizeDateToISO(value: string): string {
+  const clean = value.trim();
+  const isoMatch = clean.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (isoMatch) return clean;
+
+  const slashMatch = clean.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (slashMatch) {
+    return `${slashMatch[3]}-${String(Number(slashMatch[1])).padStart(2, "0")}-${String(
+      Number(slashMatch[2])
+    ).padStart(2, "0")}`;
+  }
+
+  const parsed = new Date(clean);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed.toISOString().slice(0, 10);
+  }
+
+  return clean;
 }
